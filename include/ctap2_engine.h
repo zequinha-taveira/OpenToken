@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "opentoken.h" // Para a declaração da função de processamento
+#include "hsm_layer.h"
 
 // Funções de processamento de comandos CTAP2
 // Implementa a função declarada em opentoken.h

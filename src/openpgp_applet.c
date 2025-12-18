@@ -45,9 +45,9 @@ void openpgp_applet_process_apdu(const uint8_t *apdu, uint16_t len, uint8_t *res
             
             // Simulação de chamada ao HSM para verificar o PIN
             // Na implementação real, o PIN seria extraído do campo Data
-            hsm_response_t hsm_resp = hsm_execute_command(HSM_CMD_VERIFY_PIN, data, lc);
+            bool success = hsm_verify_pin(data, lc);;
             
-            if (hsm_resp.success) {
+            if (success) {
                 SET_SW(OPENPGP_SW_OK);
             } else {
                 // Simulação de tentativas restantes (ex: 3 tentativas)
@@ -60,12 +60,14 @@ void openpgp_applet_process_apdu(const uint8_t *apdu, uint16_t len, uint8_t *res
             printf("OpenPGP Applet: Recebido comando PSO (Perform Security Operation).\n");
             
             // Simulação de chamada ao HSM para assinatura
-            hsm_response_t sign_resp = hsm_execute_command(HSM_CMD_SIGN, data, lc);
+            uint8_t signature_out[128];
+uint16_t signature_len = 0;
+bool success = hsm_sign_ecc(data, lc, signature_out, &signature_len);;
             
-            if (sign_resp.success) {
+            if (success) {
                 // Retorna a assinatura (simulada) e o Status Word de sucesso
-                memcpy(response, sign_resp.data, sign_resp.len);
-                *response_len = sign_resp.len;
+                memcpy(response, signature_out, signature_len);
+                *response_len = signature_len;
                 SET_SW(OPENPGP_SW_OK);
                 *response_len += 2;
             } else {

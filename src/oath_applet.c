@@ -45,22 +45,24 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len, uint8_t *respon
             printf("OATH Applet: Recebido comando CALCULATE.\n");
             
             // Simulação de chamada ao HSM para calcular o código
-            hsm_response_t hsm_resp = hsm_execute_command(HSM_CMD_CALCULATE_OATH, data, lc);
+            uint8_t code_out[64];
+uint16_t code_len = 0;
+bool success = hsm_calculate_oath(data, lc, code_out, &code_len);
             
-            if (hsm_resp.success) {
+            if (success) {
                 // Resposta OATH é um TLV (Tag, Length, Value)
                 // Tag 0x70: Response Data
                 // Tag 0x80: OATH Code
                 
                 // Simulação de resposta TLV (0x70 [Length] 0x80 [Length] [Code])
                 uint8_t code_tag = 0x80;
-                uint8_t code_len = hsm_resp.len;
+                // uint8_t code_len = hsm_resp.len; // Já definido acima
                 
                 response[0] = 0x70; // Tag 70
                 response[1] = 2 + code_len; // Length of 0x80 + code
                 response[2] = code_tag; // Tag 80
                 response[3] = code_len; // Length of code
-                memcpy(response + 4, hsm_resp.data, code_len); // Code
+                memcpy(response + 4, code_out, code_len); // Code
                 
                 *response_len = 4 + code_len;
                 
