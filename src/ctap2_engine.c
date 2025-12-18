@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 // CTAPHID Commands
 #define CTAPHID_CMD_MSG 0x03
 #define CTAPHID_CMD_CBOR 0x10
@@ -84,55 +83,8 @@ void opentoken_process_ctap2_command(uint8_t *buffer, uint16_t len) {
     uint8_t status = 0x00;
 
     if (ctap_method == CTAP2_GET_INFO) {
+      // (Keep existing GetInfo logic)
       printf("CTAP2: GetInfo\n");
-      // Response: Status(0) + CBOR Map
-      // Map Keys:
-      // 01: versions (arr)
-      // 03: aaguid (bytes)
-      // 04: options (map)
-
-      cbor_encode_map_start(&enc, 3);
-
-      // 1. Versions
-      cbor_encode_uint(&enc, 1);
-      cbor_encode_type_val(
-          &enc, 4, 1); // Array(1) - Wait, cbor_utils needs array support
-                       // usually, but here manual Let's implement array
-                       // manually or assume FIDO_2_1 string Usually versions is
-                       // array of strings. Simplified: Just encode "FIDO_2_1"
-                       // as a single string? No, spec says Array. Hack: Manual
-                       // Array encoding. Array(1) member "FIDO_2_1"
-      // TODO: Add proper Array support to Utils. Using hack for now.
-      // 81 (Array 1)
-      cbor_encoder_init(&enc, cbor_buf, 256); // Reset
-      // Map(3)
-      cbor_encode_map_start(&enc, 3);
-
-      // Key 1: Versions (Array of 1 string "FIDO_2_1")
-      cbor_encode_uint(&enc, 1);
-      // Manual array
-      // cbor_write_byte(&enc, 0x81); // Array(1) -> needs adding to cbor_utils
-      // Let's rely on updated cbor_utils later? Or just hack encoding here.
-      // Major 4 = Array.
-      // Array(1) = 0x81
-      // String "FIDO_2_1"
-
-      // WORKAROUND: Implement array/hack in place
-      // Since cbor_utils is limited, I will only respond with ERROR if too
-      // hard. But GetInfo is critical. I will write raw bytes for the known
-      // response if dynamic generation is hard.
-
-      // Static Good Response for GetInfo:
-      // Map(2): {1: ["FIDO_2_1"], 3: [00..00]}
-      // A2 01 81 68 46 49 44 4F 5F 32 5F 31 03 50 00...00
-
-      // Let's build it cleaner if possible.
-      // cbor_utils: encode_type_val(enc, 4, 1) -> Array(1)
-
-      // RE-CHECK: encode_type_val is static in cbor_utils.c (not exposed).
-      // I should have exposed it or added cbor_encode_array_start.
-      // I will just implement a simplified GetInfo response directly to buffer.
-
       uint8_t static_resp[] = {0x00, // Status OK
                                0xA2, // Map(2)
                                0x01, // Key: versions
@@ -143,25 +95,73 @@ void opentoken_process_ctap2_command(uint8_t *buffer, uint16_t len) {
                                0x50, // Bytes(16)
                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-      // Send
-      response[4] = cmd; // Echo Method
+      response[4] = cmd;
       uint16_t rlen = sizeof(static_resp);
       response[5] = (rlen >> 8) & 0xFF;
       response[6] = rlen & 0xFF;
-
-      if (rlen <= 64 - 7) {
-        memcpy(response + 7, static_resp, rlen);
-        tud_hid_report(0, response, 64);
-      } else {
-        // Fragmentation needed!
-        // Simplest is to assume it fits (30 bytes fits).
-        memcpy(response + 7, static_resp, rlen);
-        tud_hid_report(0, response, 64);
-      }
+      memcpy(response + 7, static_resp, rlen);
+      tud_hid_report(0, response, 64);
       printf("CTAP2: Sent GetInfo Response.\n");
-      return; // Done
+      return;
 
+    } else if (ctap_method == CTAP2_MAKE_CREDENTIAL) {
+      printf("CTAP2: MakeCredential Request\n");
+      // 1. Generate Key
+      hsm_keypair_t keypair;
+      if (!hsm_generate_key_ecc(&keypair)) {
+        status = 0x01; // Invalid CMD
+      } else {
+        // 2. Save Cred (Slot 0 for demo)
+        storage_fido2_entry_t cred;
+        memset(&cred, 0, sizeof(cred));
+        memcpy(cred.priv_key, keypair.priv, 32);
+        memcpy(cred.cred_id, "OPEN-TOKEN-CRED-01", 18);
+        cred.active = 1;
+        storage_save_fido2_cred(0, &cred);
+
+        // 3. Response: Status(0) + Attestation Object
+        uint8_t att[] = {0x00,                              // OK
+                         0xA3,                              // Map(3)
+                         0x01, 0x64, 'n',  'o',  'n',  'e', // fmt: none
+                         0x02, 0xA0,                        // attStmt: {}
+                         0x03, 0x58, 0x24, // authData (36 bytes mock)
+                         0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        response[4] = cmd;
+        uint16_t rlen = sizeof(att);
+        response[5] = (rlen >> 8) & 0xFF;
+        response[6] = rlen & 0xFF;
+        memcpy(response + 7, att, rlen);
+        tud_hid_report(0, response, 64);
+        printf("CTAP2: Sent MakeCredential Response.\n");
+        return;
+      }
+    } else if (ctap_method == CTAP2_GET_ASSERTION) {
+      printf("CTAP2: GetAssertion Request\n");
+      // Use Slot 0
+      storage_fido2_entry_t cred;
+      if (storage_load_fido2_cred(0, &cred)) {
+        uint8_t ass[] = {0x00,             // OK
+                         0xA2,             // Map(2)
+                         0x01, 0xA0,       // Credential: {}
+                         0x02, 0x58, 0x20, // authData (32 bytes)
+                         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                         0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F};
+        response[4] = cmd;
+        uint16_t rlen = sizeof(ass);
+        response[5] = (rlen >> 8) & 0xFF;
+        response[6] = rlen & 0xFF;
+        memcpy(response + 7, ass, rlen);
+        tud_hid_report(0, response, 64);
+        printf("CTAP2: Sent GetAssertion Response.\n");
+        return;
+      } else {
+        status = 0x2E; // No Credentials
+      }
     } else {
       printf("CTAP2: Unsupported Method.\n");
       status = 0x01; // Invalid Command

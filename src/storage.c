@@ -20,6 +20,11 @@
 #define STORAGE_FLAG_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 #define STORAGE_MAGIC 0xDEADBEEF
 
+typedef struct {
+  uint8_t pin[32];
+  uint8_t pin_len;
+} storage_system_t;
+
 // Layout:
 // Header (Magic + Version): 8 bytes
 // OATH Entries: 8 * sizeof(entry)
@@ -29,6 +34,7 @@ typedef struct __attribute__((packed)) {
   uint32_t version;
   storage_oath_entry_t oath_entries[STORAGE_OATH_MAX_ACCOUNTS];
   storage_fido2_entry_t fido2_entries[STORAGE_FIDO2_MAX_CREDS];
+  storage_system_t system;
   // Future expansion...
   uint8_t _padding[FLASH_SECTOR_SIZE - 8 -
                    (sizeof(storage_oath_entry_t) * STORAGE_OATH_MAX_ACCOUNTS) -
