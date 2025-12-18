@@ -3,8 +3,10 @@
 #include "bsp/board.h"
 #include "tusb.h"
 
-// Definições de OpenToken (placeholder)
+// Definições de OpenToken (declaradas em opentoken.h)
 #include "opentoken.h"
+#include "ctap2_engine.h"
+#include "ccid_engine.h"
 
 // Funções de callback do TinyUSB (placeholder)
 void tud_mount_cb(void) {

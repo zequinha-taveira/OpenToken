@@ -11,6 +11,10 @@ pico_sdk_init()
 # Adiciona o diretório de código fonte
 add_executable(${PROJECT_NAME}
     src/main.c
+    src/usb_descriptors.c
+    src/hsm_layer.c
+    src/ctap2_engine.c
+    src/ccid_engine.c
 )
 
 # Configurações para o TinyUSB
