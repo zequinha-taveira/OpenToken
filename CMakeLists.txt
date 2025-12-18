@@ -12,6 +12,8 @@ pico_sdk_init()
 add_executable(${PROJECT_NAME}
     src/main.c
     src/usb_descriptors.c
+    src/storage.c
+    src/cbor_utils.c
     src/hsm_layer.c
     src/ctap2_engine.c
     src/ccid_engine.c
@@ -26,6 +28,8 @@ target_link_libraries(${PROJECT_NAME}
     pico_stdlib
     pico_cyw43_driver # Se for usar RP2350 com Wi-Fi
     tinyusb_device
+    hardware_flash
+    pico_mbedtls # Crypto
 )
 
 # Configurações de compilação
