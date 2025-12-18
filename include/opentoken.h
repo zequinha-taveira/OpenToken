@@ -2,11 +2,12 @@
 #define OPENTOKEN_H
 
 #include <stdint.h>
+#include "tusb_config.h" // Inclui as definições de configuração do TinyUSB
 
 // Definições de constantes e estruturas de dados para o OpenToken
-// Exemplo: VID/PID (Vendor ID / Product ID)
-#define OPENTOKEN_VID 0x1209 // Exemplo: USB Implementers Forum, Inc.
-#define OPENTOKEN_PID 0x0001 // Exemplo: OpenToken Security Key
+// Usando as definições de tusb_config.h para VID/PID
+#define OPENTOKEN_VID CFG_TUD_VENDOR_AND_PRODUCT_ID
+#define OPENTOKEN_PID CFG_TUD_VENDOR_AND_PRODUCT_ID
 
 // Funções de processamento de comandos (declaradas no main.c ou em outros arquivos)
 void opentoken_process_ctap2_command(uint8_t *buffer, uint16_t len);
