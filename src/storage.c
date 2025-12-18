@@ -7,7 +7,6 @@
 #include "hardware/sync.h"
 #include "pico/stdlib.h"
 
-
 // Check Flash usage.
 // We will use the *last* sector of flash.
 // Default PICO_FLASH_SIZE_BYTES is often 2MB (2 * 1024 * 1024)
@@ -29,9 +28,11 @@ typedef struct __attribute__((packed)) {
   uint32_t magic;
   uint32_t version;
   storage_oath_entry_t oath_entries[STORAGE_OATH_MAX_ACCOUNTS];
+  storage_fido2_entry_t fido2_entries[STORAGE_FIDO2_MAX_CREDS];
   // Future expansion...
   uint8_t _padding[FLASH_SECTOR_SIZE - 8 -
-                   (sizeof(storage_oath_entry_t) * STORAGE_OATH_MAX_ACCOUNTS)];
+                   (sizeof(storage_oath_entry_t) * STORAGE_OATH_MAX_ACCOUNTS) -
+                   (sizeof(storage_fido2_entry_t) * STORAGE_FIDO2_MAX_CREDS)];
 } storage_flash_layout_t;
 
 // Verify size
@@ -40,6 +41,56 @@ _Static_assert(sizeof(storage_flash_layout_t) == FLASH_SECTOR_SIZE,
 
 static storage_flash_layout_t g_cache;
 static bool g_dirty = false;
+
+bool storage_load_fido2_cred(uint8_t index, storage_fido2_entry_t *out_entry) {
+  if (index >= STORAGE_FIDO2_MAX_CREDS)
+    return false;
+  if (g_cache.fido2_entries[index].active != 1)
+    return false;
+
+  memcpy(out_entry, &g_cache.fido2_entries[index],
+         sizeof(storage_fido2_entry_t));
+  return true;
+}
+
+bool storage_save_fido2_cred(uint8_t index,
+                             const storage_fido2_entry_t *entry) {
+  if (index >= STORAGE_FIDO2_MAX_CREDS)
+    return false;
+
+  memcpy(&g_cache.fido2_entries[index], entry, sizeof(storage_fido2_entry_t));
+  g_cache.fido2_entries[index].active = 1;
+  g_dirty = true;
+  storage_commit();
+  return true;
+}
+
+bool storage_delete_fido2_cred(uint8_t index) {
+  if (index >= STORAGE_FIDO2_MAX_CREDS)
+    return false;
+
+  memset(&g_cache.fido2_entries[index], 0, sizeof(storage_fido2_entry_t));
+  g_dirty = true;
+  storage_commit();
+  return true;
+}
+
+bool storage_find_fido2_cred_by_rp(const uint8_t *rp_id_hash,
+                                   storage_fido2_entry_t *out_entry,
+                                   uint8_t *index_out) {
+  for (uint8_t i = 0; i < STORAGE_FIDO2_MAX_CREDS; i++) {
+    if (g_cache.fido2_entries[i].active == 1 &&
+        memcmp(g_cache.fido2_entries[i].rp_id_hash, rp_id_hash, 32) == 0) {
+      if (out_entry)
+        memcpy(out_entry, &g_cache.fido2_entries[i],
+               sizeof(storage_fido2_entry_t));
+      if (index_out)
+        *index_out = i;
+      return true;
+    }
+  }
+  return false;
+}
 
 void storage_init(void) {
   // Read flash into cache

@@ -21,6 +21,11 @@ add_executable(${PROJECT_NAME}
     src/openpgp_applet.c
 )
 
+# Adiciona o diretório de includes
+target_include_directories(${PROJECT_NAME} PRIVATE 
+    include
+)
+
 # Configurações para o TinyUSB
 # Assume que o TinyUSB será adicionado como um submodule ou via pico_add_extra_dependency
 # Para simplificar, vamos apenas adicionar as bibliotecas necessárias para USB

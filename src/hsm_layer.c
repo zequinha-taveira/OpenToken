@@ -1,5 +1,8 @@
 #include "hsm_layer.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // mbedTLS Includes
@@ -9,7 +12,6 @@
 #include "mbedtls/entropy.h"
 #include "mbedtls/md.h"
 #include "mbedtls/platform.h"
-
 
 // Static Contexts (to avoid stack overflow on small micros)
 // In a real generic implem, these should be managed more carefully.
@@ -86,14 +88,13 @@ bool hsm_calculate_oath(const uint8_t *challenge_in, uint16_t challenge_len,
   return true;
 }
 
-bool hsm_generate_key_ecc(hsm_pubkey_t *pubkey_out) {
+bool hsm_generate_key_ecc(hsm_keypair_t *keypair_out) {
   ensure_init();
   printf("HSM: Generating ECC P-256 Key...\n");
 
   mbedtls_ecp_keypair key;
   mbedtls_ecp_keypair_init(&key);
 
-  // Gen Key
   if (mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, &key,
                           mbedtls_ctr_drbg_random, &ctr_drbg) != 0) {
     printf("HSM: Key Gen Failed\n");
@@ -101,31 +102,24 @@ bool hsm_generate_key_ecc(hsm_pubkey_t *pubkey_out) {
     return false;
   }
 
-  // Export Public Point X/Y
-  // mbedtls stores in MPI. We need raw bytes.
-  // X and Y are 32 bytes each for P-256.
-  mbedtls_mpi_write_binary(&key.Q.X, pubkey_out->x, 32);
-  mbedtls_mpi_write_binary(&key.Q.Y, pubkey_out->y, 32);
-
-  // TODO: Store Private Key (d) in Flash securely.
-  // This function signature doesn't take an ID/Handle.
-  // Just a demo for now.
+  mbedtls_mpi_write_binary(&key.Q.X, keypair_out->pub.x, 32);
+  mbedtls_mpi_write_binary(&key.Q.Y, keypair_out->pub.y, 32);
+  mbedtls_mpi_write_binary(&key.d, keypair_out->priv, 32);
 
   mbedtls_ecp_keypair_free(&key);
   return true;
 }
 
-bool hsm_sign_ecc(const uint8_t *hash_in, uint16_t hash_len,
-                  uint8_t *signature_out, uint16_t *signature_len) {
+bool hsm_sign_ecc(const uint8_t *priv_key, const uint8_t *hash_in,
+                  uint16_t hash_len, uint8_t *signature_out,
+                  uint16_t *signature_len) {
   ensure_init();
   printf("HSM: Signing ECC...\n");
 
-  // Regenerate a key just to sign (Dummy Logic because we didn't save the
-  // private key above) REAL WORLD: Load private key from secure storage.
   mbedtls_ecp_keypair key;
   mbedtls_ecp_keypair_init(&key);
-  mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, &key, mbedtls_ctr_drbg_random,
-                      &ctr_drbg);
+  mbedtls_ecp_group_load(&key.grp, MBEDTLS_ECP_DP_SECP256R1);
+  mbedtls_mpi_read_binary(&key.d, priv_key, 32);
 
   mbedtls_mpi r, s;
   mbedtls_mpi_init(&r);
@@ -133,17 +127,11 @@ bool hsm_sign_ecc(const uint8_t *hash_in, uint16_t hash_len,
 
   if (mbedtls_ecdsa_sign(&key.grp, &r, &s, &key.d, hash_in, hash_len,
                          mbedtls_ctr_drbg_random, &ctr_drbg) != 0) {
+    mbedtls_mpi_free(&r);
+    mbedtls_mpi_free(&s);
     mbedtls_ecp_keypair_free(&key);
     return false;
   }
-
-  // Write ASN.1 Signature (Sequence { r, s }) OR Raw format?
-  // WebAuthn usually expects ASN.1 DER.
-  // We'll output simple Raw concatenation for now (64 bytes) if requested by
-  // the pointer size? Or doing a manual DER encoding. Let's assume the caller
-  // processes DER if needed, BUT the stub returned 64 bytes (Raw R|S). FIDO U2F
-  // raw is 64 bytes. FIDO2 often uses COSE which wraps raw. We will return Raw
-  // R (32) | S (32).
 
   mbedtls_mpi_write_binary(&r, signature_out, 32);
   mbedtls_mpi_write_binary(&s, signature_out + 32, 32);
