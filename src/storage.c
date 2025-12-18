@@ -1,6 +1,9 @@
 #include "storage.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h> // For proper compilation
 #include <string.h>
+
 
 // Pico SDK Headers
 #include "hardware/flash.h"
