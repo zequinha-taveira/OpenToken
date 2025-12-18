@@ -15,6 +15,8 @@ add_executable(${PROJECT_NAME}
     src/hsm_layer.c
     src/ctap2_engine.c
     src/ccid_engine.c
+    src/oath_applet.c
+    src/openpgp_applet.c
 )
 
 # Configurações para o TinyUSB
