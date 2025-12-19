@@ -1,6 +1,8 @@
 #include "ccid_device.h"
 #include "device/usbd.h"
 #include "device/usbd_pvt.h"
+#include <stdint.h>
+#include <string.h>
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF
@@ -24,25 +26,26 @@ static ccid_interface_t _ccid_itf;
 //--------------------------------------------------------------------+
 // CALLBACKS IMPLEMENTED IN USB_DESCRIPTORS.C
 //--------------------------------------------------------------------+
-extern void tud_ccid_icc_power_on_cb(uint8_t slot, uint32_t voltage);
-extern void tud_ccid_icc_power_off_cb(uint8_t slot);
-extern void tud_ccid_xfr_block_cb(uint8_t slot, uint8_t const *buffer,
-                                  uint16_t bufsize);
+extern void tud_ccid_icc_power_on_cb(uint8_t slot, uint8_t seq,
+                                     uint32_t voltage);
+extern void tud_ccid_icc_power_off_cb(uint8_t slot, uint8_t seq);
+extern void tud_ccid_xfr_block_cb(uint8_t slot, uint8_t seq,
+                                  uint8_t const *buffer, uint16_t bufsize);
 
 //--------------------------------------------------------------------+
 // APPLICATION API
 //--------------------------------------------------------------------+
-void tud_ccid_icc_power_on_response(uint8_t slot, uint8_t status, uint8_t error,
-                                    uint8_t const *atr, uint16_t atr_len) {
-  (void)slot;
+void tud_ccid_icc_power_on_response(uint8_t slot, uint8_t seq, uint8_t status,
+                                    uint8_t error, uint8_t const *atr,
+                                    uint16_t atr_len) {
   uint8_t res[10 + atr_len];
   res[0] = 0x80; // RDR_to_PC_DataBlock
   res[1] = atr_len & 0xFF;
   res[2] = (atr_len >> 8) & 0xFF;
   res[3] = (atr_len >> 16) & 0xFF;
   res[4] = (atr_len >> 24) & 0xFF;
-  res[5] = 0; // Slot
-  res[6] = 0; // Seq
+  res[5] = slot;
+  res[6] = seq;
   res[7] = status;
   res[8] = error;
   res[9] = 0; // Chain
@@ -52,17 +55,16 @@ void tud_ccid_icc_power_on_response(uint8_t slot, uint8_t status, uint8_t error,
   usbd_edpt_xfer(0, _ccid_itf.ep_in, res, sizeof(res));
 }
 
-void tud_ccid_icc_power_off_response(uint8_t slot, uint8_t status,
+void tud_ccid_icc_power_off_response(uint8_t slot, uint8_t seq, uint8_t status,
                                      uint8_t error) {
-  (void)slot;
   uint8_t res[10];
   res[0] = 0x81; // RDR_to_PC_SlotStatus
   res[1] = 0;
   res[2] = 0;
   res[3] = 0;
   res[4] = 0;
-  res[5] = 0;
-  res[6] = 0;
+  res[5] = slot;
+  res[6] = seq;
   res[7] = status;
   res[8] = error;
   res[9] = 0;
@@ -70,10 +72,9 @@ void tud_ccid_icc_power_off_response(uint8_t slot, uint8_t status,
   usbd_edpt_xfer(0, _ccid_itf.ep_in, res, sizeof(res));
 }
 
-void tud_ccid_xfr_block_response(uint8_t slot, uint8_t status, uint8_t error,
-                                 uint8_t const *response,
+void tud_ccid_xfr_block_response(uint8_t slot, uint8_t seq, uint8_t status,
+                                 uint8_t error, uint8_t const *response,
                                  uint16_t response_len) {
-  (void)slot;
   uint16_t total_len = 10 + response_len;
   uint8_t res[total_len];
   res[0] = 0x80; // RDR_to_PC_DataBlock
@@ -81,8 +82,8 @@ void tud_ccid_xfr_block_response(uint8_t slot, uint8_t status, uint8_t error,
   res[2] = (response_len >> 8) & 0xFF;
   res[3] = (response_len >> 16) & 0xFF;
   res[4] = (response_len >> 24) & 0xFF;
-  res[5] = 0;
-  res[6] = 0;
+  res[5] = slot;
+  res[6] = seq;
   res[7] = status;
   res[8] = error;
   res[9] = 0;
@@ -148,16 +149,16 @@ bool ccid_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t result,
 
       if (msg_type == 0x62) // PC_to_RDR_IccPowerOn
       {
-        tud_ccid_icc_power_on_cb(slot, 0);
+        tud_ccid_icc_power_on_cb(slot, _ccid_itf.epout_buf[6], 0);
       } else if (msg_type == 0x63) // PC_to_RDR_IccPowerOff
       {
-        tud_ccid_icc_power_off_cb(slot);
+        tud_ccid_icc_power_off_cb(slot, _ccid_itf.epout_buf[6]);
       } else if (msg_type == 0x6f) // PC_to_RDR_XfrBlock
       {
         uint32_t data_len =
             tu_le32toh(*((uint32_t const *)(_ccid_itf.epout_buf + 1)));
-        tud_ccid_xfr_block_cb(slot, _ccid_itf.epout_buf + 10,
-                              (uint16_t)data_len);
+        tud_ccid_xfr_block_cb(slot, _ccid_itf.epout_buf[6],
+                              _ccid_itf.epout_buf + 10, (uint16_t)data_len);
       }
     }
 

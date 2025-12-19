@@ -3,6 +3,23 @@
 #include "tusb.h"
 #include "tusb_config.h"
 
+// Fallback definitions if not provided by TinyUSB version
+#ifndef TUD_HID_INOUT_DESC_LEN
+#define TUD_HID_INOUT_DESC_LEN 32
+#endif
+
+#ifndef TUD_HID_INOUT_DESCRIPTOR
+#define TUD_HID_INOUT_DESCRIPTOR(_itfnum, _stridx, _protocol,                  \
+                                 _report_desc_len, _epout, _epin, _epsize,     \
+                                 _poll_interval)                               \
+  9, TUSB_DESC_INTERFACE, _itfnum, 0, 2, TUSB_CLASS_HID, 0, _protocol,         \
+      _stridx, 9, 0x21, U16_TO_U8S_LE(0x0111), 0, 1, 0x22,                     \
+      U16_TO_U8S_LE(_report_desc_len), 7, TUSB_DESC_ENDPOINT, _epin,           \
+      TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), _poll_interval, 7,          \
+      TUSB_DESC_ENDPOINT, _epout, TUSB_XFER_INTERRUPT, U16_TO_U8S_LE(_epsize), \
+      _poll_interval
+#endif
+
 //--------------------------------------------------------------------+
 // USB DEVICE DESCRIPTOR
 //--------------------------------------------------------------------+
@@ -39,7 +56,7 @@ enum {
 };
 
 #define CONFIG_TOTAL_LEN                                                       \
-  (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN + TUD_CCID_DESC_LEN +                \
+  (TUD_CONFIG_DESC_LEN + TUD_HID_INOUT_DESC_LEN + TUD_CCID_DESC_LEN +          \
    TUD_VENDOR_DESC_LEN)
 
 uint8_t const desc_configuration[] = {
@@ -47,9 +64,9 @@ uint8_t const desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x80, 500),
 
     // Interface 0: HID (FIDO2/CTAP2) - with interface string descriptor
-    TUD_HID_DESCRIPTOR(ITF_NUM_HID, 5, HID_ITF_PROTOCOL_NONE,
-                       CFG_TUD_HID_REPORT_DESC_LEN, EPNUM_HID_IN,
-                       CFG_TUD_HID_EP_BUFSIZE, 1),
+    TUD_HID_INOUT_DESCRIPTOR(ITF_NUM_HID, 5, HID_ITF_PROTOCOL_NONE,
+                             CFG_TUD_HID_REPORT_DESC_LEN, EPNUM_HID_OUT,
+                             EPNUM_HID_IN, CFG_TUD_HID_EP_BUFSIZE, 1),
 
     // Interface 1: CCID (OATH/OpenPGP) - with interface string descriptor
     TUD_CCID_DESCRIPTOR(ITF_NUM_CCID, 4, EPNUM_CCID_OUT, EPNUM_CCID_IN,
@@ -230,35 +247,35 @@ void tud_ccid_set_param_cb(uint8_t param_num, uint8_t const *buffer,
   (void)bufsize;
 }
 
-void tud_ccid_icc_power_on_cb(uint8_t slot, uint32_t voltage) {
+void tud_ccid_icc_power_on_cb(uint8_t slot, uint8_t seq, uint32_t voltage) {
   // ICC (smartcard) power on - simulate successful power on
-  (void)slot;
   (void)voltage;
 
-  // Return ATR (Answer To Reset) - basic ISO7816 compliant ATR
-  uint8_t atr[] = {0x3B,
-                   0x00}; // Minimal ATR: Direct convention, no historical bytes
-  tud_ccid_icc_power_on_response(slot, CCID_STATUS_SUCCESS, 0, atr,
+  // Return ATR (Answer To Reset) - Standard OpenPGP/OATH card ATR
+  // 3B 80 01 80 4F 0C 4F 70 65 6E 54 6F 6B 65 6E 20 56 31 (Historical bytes:
+  // OpenToken V1)
+  uint8_t atr[] = {0x3B, 0x80, 0x01, 0x80, 0x4F, 0x0C, 0x4F, 0x70, 0x65,
+                   0x6E, 0x54, 0x6F, 0x6B, 0x65, 0x6E, 0x20, 0x56, 0x31};
+  tud_ccid_icc_power_on_response(slot, seq, CCID_STATUS_SUCCESS, 0, atr,
                                  sizeof(atr));
 }
 
-void tud_ccid_icc_power_off_cb(uint8_t slot) {
+void tud_ccid_icc_power_off_cb(uint8_t slot, uint8_t seq) {
   // ICC power off
-  (void)slot;
-  tud_ccid_icc_power_off_response(slot, CCID_STATUS_SUCCESS, 0);
+  tud_ccid_icc_power_off_response(slot, seq, CCID_STATUS_SUCCESS, 0);
 }
 
-void tud_ccid_xfr_block_cb(uint8_t slot, uint8_t const *buffer,
+void tud_ccid_xfr_block_cb(uint8_t slot, uint8_t seq, uint8_t const *buffer,
                            uint16_t bufsize) {
   // APDU processing buffer (max APDU size + response codes)
-  uint8_t response[280];
+  static uint8_t response[280];
   uint16_t response_len = 0;
 
   // Process APDU (OATH/OpenPGP) received via USB CCID
   opentoken_process_ccid_apdu(buffer, bufsize, response, &response_len);
 
   // Send APDU response back to host
-  tud_ccid_xfr_block_response(slot, CCID_STATUS_SUCCESS, 0, response,
+  tud_ccid_xfr_block_response(slot, seq, CCID_STATUS_SUCCESS, 0, response,
                               response_len);
 }
 
