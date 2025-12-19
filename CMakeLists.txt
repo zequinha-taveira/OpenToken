@@ -6,6 +6,9 @@ include(pico_sdk_init.cmake)
 
 project(opentoken_firmware C CXX)
 
+# Add local boards directory
+list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+
 # Inicializa o SDK
 pico_sdk_init()
 

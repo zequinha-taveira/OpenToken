@@ -4,9 +4,14 @@
 #include "pico/stdlib.h"
 #include "ws2812.pio.h"
 
-
 // Hardware Configuration
+#ifndef WS2812_PIN
+#ifdef PICO_DEFAULT_WS2812_PIN
+#define WS2812_PIN PICO_DEFAULT_WS2812_PIN
+#else
 #define WS2812_PIN 22
+#endif
+#endif
 #define IS_RGBW false
 
 static PIO g_pio = pio0;
