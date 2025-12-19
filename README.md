@@ -1,2 +1,81 @@
-OpenToken - Firmware de Interoperabilidade Real (RP2350)
-Firmware para o OpenToken, focado em interoperabilidade via protocolos padronizados (FIDO2/CTAP2, OATH/CCID, OpenPGP/CCID) no microcontrolador RP2350.
+<div align="center">
+  <img src="./assets/logo.png" alt="OpenToken Logo" width="800">
+
+  # OpenToken
+  ### *Universal Security & Interoperability Firmware for RP2350*
+
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/zequinha-taveira/OpenToken)
+  [![Platform](https://img.shields.io/badge/platform-RP2350-blue)](https://www.raspberrypi.com/documentation/microcontrollers/rp2350.html)
+  [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
+  [![Protocol](https://img.shields.io/badge/protocol-FIDO2%2C%20OATH%2C%20OpenPGP-blueviolet)](#-funcionalidades)
+
+  ---
+</div>
+
+OpenToken é um firmware de segurança de alto desempenho desenvolvido especificamente para o microcontrolador **Raspberry Pi RP2350 (Pico 2)**. Ele transforma hardware acessível em um módulo de segurança robusto, unificando os principais padrões de autenticação e criptografia do mercado em um único dispositivo.
+
+## 🛡️ Camadas de Segurança
+
+O OpenToken foi projetado com uma filosofia de *Security by Design*, dividindo o hardware em domínios lógicos:
+
+*   **Secure Storage**: Armazenamento em Flash isolado para segredos e credenciais.
+*   **HSM Layer**: Uma camada de abstração criptográfica que interage diretamente com o hardware para operações de chave privada.
+*   **Protocol Engines**: Motores de estado independentes para lidar com diferentes fluxos de autenticação sem vazamento de contexto.
+
+## 🚀 Funcionalidades Principais
+
+| Funcionalidade | Descrição | Protocolo |
+| :--- | :--- | :--- |
+| **FIDO2 / U2F** | Autenticação moderna sem senha e 2FA para web. | CTAP2 / HID |
+| **OATH TOTP/HOTP** | Gerador de códigos para 2FA compatível com Yubico. | CCID / ISO7816 |
+| **OpenPGP** | Suporte para chaves PGP (Assinatura, Criptografia, Auth). | CCID / ISO7816 |
+| **HSM Abstraction** | Camada unificada para operações RSA/ECC seguras. | mbedTLS 3.x |
+| **Custom CCID** | Driver USB CCID de alto desempenho otimizado para o RP2350. | USB Device |
+
+## 🛠️ Começando
+
+### Pré-requisitos
+- [ARM GNU Toolchain](https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain)
+- [CMake](https://cmake.org/download/) (v3.13+)
+- [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
+
+### Build Rápido
+```bash
+# Clone e configure
+git clone https://github.com/zequinha-taveira/OpenToken.git
+cd OpenToken
+
+# Configure o build (MinGW/Ninja)
+cmake -B build -G "MinGW Makefiles" -DPICO_SDK_FETCH_FROM_GIT=ON
+
+# Compile o firmware
+cmake --build build
+```
+
+## 🗺️ Roadmap de Desenvolvimento
+
+- [x] Implementação do Driver USB CCID Customizado
+- [x] Integração com mbedTLS 3.x para RP2350
+- [x] Engine básica para FIDO2/CTAP2
+- [ ] Implementação completa de Residente Keys (RK) no FIDO2
+- [ ] Suporte para criptografia de chaves via Hardware Root of Trust
+- [ ] Interface de gerenciamento via WebUSB
+
+## 🤝 Contribuição
+
+Contribuições são fundamentais para tornar o OpenToken o padrão de segurança open-source para o RP2350. Sinta-se à vontade para abrir issues ou enviar Pull Requests.
+
+1. Faça um Fork do projeto
+2. Crie uma Branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a Branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
+
+---
+<div align="center">
+  Desenvolvido com ❤️ pela comunidade OpenToken.
+</div>
