@@ -286,7 +286,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
                                 tusb_control_request_t const *request) {
   // Handle MS OS 2.0 Descriptor Request
   if (request->bmRequestType_bit.type == TUSB_REQ_TYPE_VENDOR &&
-      request->bRequest == 0xB2) {
+      request->bRequest == 0x02) {
     return tud_control_xfer(rhport, request, (void *)(uintptr_t)desc_ms_os_20,
                             sizeof(desc_ms_os_20));
   }
