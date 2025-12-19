@@ -1,1 +1,12 @@
-*.elf\n*.bin\n*.uf2\nbuild/\n.vscode/\n.DS_Store
+build/
+*.elf
+*.bin
+*.uf2
+*.hex
+*.map
+*.dis
+.vscode/
+.DS_Store
+_deps/
+*~
+*.swp

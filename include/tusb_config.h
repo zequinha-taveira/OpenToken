@@ -10,7 +10,9 @@
 //--------------------------------------------------------------------
 
 // USB Device Configuration
+#define CFG_TUD_ENABLED               1
 #define CFG_TUD_MAX_POWER_MA          500
+#define CFG_TUSB_RHPORT0_MODE         (OPT_MODE_DEVICE) 
 
 // USB Class Configuration - Composite Device with HID + CCID
 #define CFG_TUD_CDC                 0

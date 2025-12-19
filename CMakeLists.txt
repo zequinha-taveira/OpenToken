@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 # Configuração para o SDK do Raspberry Pi Pico (RP2040/RP2350)
+set(PICO_SDK_FETCH_FROM_GIT ON)
 include(pico_sdk_init.cmake)
 
 project(opentoken_firmware C CXX)
@@ -21,6 +22,7 @@ add_executable(${PROJECT_NAME}
     src/openpgp_applet.c
     src/yubikey_mgmt.c
     src/error_handling.c
+    src/ccid_device.c
 )
 
 # Adiciona o diretório de includes

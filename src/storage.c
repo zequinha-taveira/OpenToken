@@ -2,9 +2,9 @@
 #include "error_handling.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h> // For proper compilation
 #include <string.h>
-
 
 // Pico SDK Headers
 #include "hardware/flash.h"
@@ -120,7 +120,7 @@ void storage_init(void) {
     memset(&g_cache, 0, sizeof(storage_flash_layout_t));
     g_cache.magic = STORAGE_MAGIC;
     g_cache.version = 1;
-    
+
     // Initialize PIN data with default values
     g_cache.system.retries_remaining = 3; // HSM_PIN_MAX_RETRIES
     // Default PIN hash for "123456"
@@ -128,12 +128,14 @@ void storage_init(void) {
     // Simple hash for demo - in production use proper PBKDF2/scrypt
     memset(g_cache.system.pin_hash, 0, 32);
     memcpy(g_cache.system.pin_hash, default_pin, sizeof(default_pin));
-    
+
     // Default admin PIN hash for "12345678"
-    const uint8_t default_admin_pin[] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38};
+    const uint8_t default_admin_pin[] = {0x31, 0x32, 0x33, 0x34,
+                                         0x35, 0x36, 0x37, 0x38};
     memset(g_cache.system.admin_pin_hash, 0, 32);
-    memcpy(g_cache.system.admin_pin_hash, default_admin_pin, sizeof(default_admin_pin));
-    
+    memcpy(g_cache.system.admin_pin_hash, default_admin_pin,
+           sizeof(default_admin_pin));
+
     g_dirty = true;
     storage_commit();
   } else {
@@ -225,34 +227,23 @@ void storage_commit(void) {
     return;
 
   printf("Storage: Committing to Flash with error handling...\n");
-  
+
   // Start timeout for flash operation
   if (!timeout_start(5000)) { // 5 second timeout for flash operations
-    ERROR_REPORT_ERROR(ERROR_TIMEOUT_PROTOCOL_RESPONSE, "Failed to start flash timeout");
+    ERROR_REPORT_ERROR(ERROR_TIMEOUT_PROTOCOL_RESPONSE,
+                       "Failed to start flash timeout");
     return;
   }
-  
+
   // Disable interrupts to prevent crash during flash write (XIP is unavailable)
   uint32_t ints = save_and_disable_interrupts();
 
-  // Attempt flash erase with error checking
-  int erase_result = flash_range_erase(STORAGE_FLAG_OFFSET, FLASH_SECTOR_SIZE);
-  if (erase_result != 0) {
-    restore_interrupts(ints);
-    timeout_reset();
-    ERROR_REPORT_ERROR(ERROR_STORAGE_FLASH_ERROR, "Flash erase failed: %d", erase_result);
-    return;
-  }
-  
-  // Attempt flash program with error checking
-  int program_result = flash_range_program(STORAGE_FLAG_OFFSET, (const uint8_t *)&g_cache,
-                                          FLASH_SECTOR_SIZE);
-  if (program_result != 0) {
-    restore_interrupts(ints);
-    timeout_reset();
-    ERROR_REPORT_ERROR(ERROR_STORAGE_FLASH_ERROR, "Flash program failed: %d", program_result);
-    return;
-  }
+  // Attempt flash erase (returns void in Pico SDK)
+  flash_range_erase(STORAGE_FLAG_OFFSET, FLASH_SECTOR_SIZE);
+
+  // Attempt flash program (returns void in Pico SDK)
+  flash_range_program(STORAGE_FLAG_OFFSET, (const uint8_t *)&g_cache,
+                      FLASH_SECTOR_SIZE);
 
   restore_interrupts(ints);
   timeout_reset();

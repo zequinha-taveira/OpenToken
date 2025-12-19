@@ -13,6 +13,12 @@
 #include "yubikey_mgmt.h"
 #include "error_handling.h"
 
+// Helper function for tusb_init (which is a macro in modern TinyUSB)
+// to satisfy retry_operation's function pointer requirement
+bool opentoken_usb_init(void) {
+    return tusb_init();
+}
+
 // External descriptor declarations (defined in usb_descriptors.c)
 extern tusb_desc_device_t const desc_device;
 extern uint8_t const desc_configuration[];
@@ -105,7 +111,7 @@ int main() {
 
     // Initialize TinyUSB composite device with retry
     usb_stability_update_state(USB_STATE_CONNECTING);
-    if (!retry_operation((bool (*)(void))tusb_init, &RETRY_CONFIG_USB)) {
+    if (!retry_operation((bool (*)(void))opentoken_usb_init, &RETRY_CONFIG_USB)) {
         ERROR_REPORT_CRITICAL(ERROR_USB_ENUMERATION_FAILED, "USB initialization failed");
         system_enter_safe_mode();
     }

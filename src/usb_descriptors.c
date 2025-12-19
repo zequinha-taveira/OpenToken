@@ -1,6 +1,7 @@
 #include "opentoken.h"
 #include "tusb.h"
 #include "tusb_config.h"
+#include "ccid_device.h"
 
 
 //--------------------------------------------------------------------+
