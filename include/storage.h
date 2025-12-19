@@ -76,4 +76,7 @@ bool storage_save_pin_data(const storage_pin_data_t *data);
 // Global Commit (if utilizing caching, otherwise direct write)
 void storage_commit(void);
 
+// Full device reset (secure erase)
+bool storage_reset_device(void);
+
 #endif // STORAGE_H

@@ -266,3 +266,30 @@ void storage_commit(void) {
   g_dirty = false;
   printf("Storage: Commit completed successfully.\n");
 }
+
+bool storage_reset_device(void) {
+  printf("Storage: Performing full device reset (secure erase)...\n");
+
+  // Wipe cache and re-initialize with defaults
+  memset(&g_cache, 0, sizeof(storage_flash_layout_t));
+  g_cache.magic = STORAGE_MAGIC;
+  g_cache.version = 1;
+
+  // Initialize PIN data with default values (same as storage_init)
+  g_cache.system.retries_remaining = 3;
+  const uint8_t default_pin[] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36};
+  memset(g_cache.system.pin_hash, 0, 32);
+  memcpy(g_cache.system.pin_hash, default_pin, sizeof(default_pin));
+
+  const uint8_t default_admin_pin[] = {0x31, 0x32, 0x33, 0x34,
+                                       0x35, 0x36, 0x37, 0x38};
+  memset(g_cache.system.admin_pin_hash, 0, 32);
+  memcpy(g_cache.system.admin_pin_hash, default_admin_pin,
+         sizeof(default_admin_pin));
+
+  g_dirty = true;
+  storage_commit(); // This erases and re-writes the flash sector
+
+  printf("Storage: Device reset completed.\n");
+  return true;
+}

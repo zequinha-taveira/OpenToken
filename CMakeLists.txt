@@ -24,7 +24,11 @@ add_executable(${PROJECT_NAME}
     src/error_handling.c
     src/ccid_device.c
     src/webusb_handler.c
+    src/led_status.c
 )
+
+# Generate PIO header
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
 
 # Adiciona o diretório de includes
 target_include_directories(${PROJECT_NAME} PRIVATE 
@@ -37,7 +41,9 @@ target_link_libraries(${PROJECT_NAME}
     tinyusb_device
     tinyusb_board
     hardware_flash
+    hardware_flash
     hardware_sync
+    hardware_pio
     pico_mbedtls # Cryptographic operations
 )
 

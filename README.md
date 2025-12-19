@@ -32,6 +32,17 @@ O OpenToken foi projetado com uma filosofia de *Security by Design*, dividindo o
 | **HSM Abstraction** | Camada unificada para operações RSA/ECC seguras. | mbedTLS 3.x |
 | **Custom CCID** | Driver USB CCID de alto desempenho otimizado para o RP2350. | USB Device |
 
+### 4. Status Indicator (WS2812 LED)
+Integrated a WS2812 RGB LED driver (GP22) to provide visual feedback for common operations:
+
+| Color | State | Trigger |
+| :--- | :--- | :--- |
+| 🟢 **Green** | **Idle** | Device initialized and connected |
+| 🔵 **Blue** | **FIDO2** | User Presence (Touch) Request |
+| 🟡 **Yellow**| **OATH** | TOTP/HOTP Calculation Activity |
+| 🔴 **Red** | **Error** | Critical Fault / Safe Mode |
+| 🟣 **White** | **Boot** | Power On / Initialization |
+
 ## 🛠️ Começando
 
 ### Pré-requisitos

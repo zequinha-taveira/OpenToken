@@ -168,6 +168,19 @@ static void handle_delete_oath(uint8_t slot_id) {
 }
 
 /**
+ * @brief Handle RESET_DEVICE command - Perform a full secure wipe
+ */
+static void handle_reset_device(void) {
+  printf("WebUSB: Received global reset command\n");
+  if (storage_reset_device()) {
+    webusb_response[0] = WEBUSB_STATUS_OK;
+  } else {
+    webusb_response[0] = WEBUSB_STATUS_ERROR;
+  }
+  webusb_response_len = 1;
+}
+
+/**
  * @brief Process incoming WebUSB command
  * @param buffer Input command buffer
  * @param bufsize Input buffer size
@@ -215,6 +228,10 @@ void opentoken_webusb_rx_cb(uint8_t const *buffer, uint16_t bufsize) {
       webusb_response[0] = WEBUSB_STATUS_ERROR;
       webusb_response_len = 1;
     }
+    break;
+
+  case WEBUSB_CMD_RESET_DEVICE:
+    handle_reset_device();
     break;
 
   default:

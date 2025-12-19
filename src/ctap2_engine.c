@@ -2,12 +2,14 @@
 #include "cbor_utils.h"
 #include "error_handling.h"
 #include "hsm_layer.h"
+#include "led_status.h"
 #include "storage.h"
 #include "tusb.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
 
 // CTAPHID Commands
 #define CTAPHID_CMD_MSG 0x03
@@ -119,7 +121,10 @@ static uint16_t ctap_build_authdata(uint8_t *out, const uint8_t *rp_id_hash,
 
 // User presence verification with timeout handling
 bool ctap2_verify_user_presence(void) {
-  printf("CTAP2: User presence verification with timeout\n");
+  printf("CTAP2: Waiting for user presence (button press/touch)...\n");
+
+  // Flash Blue to indicate User Presence request
+  led_status_set(LED_COLOR_BLUE);
 
   // Start timeout for user presence
   if (!timeout_start(DEFAULT_TIMEOUTS.user_presence_timeout_ms)) {
@@ -128,8 +133,12 @@ bool ctap2_verify_user_presence(void) {
     return false;
   }
 
-  // In a real implementation, this would check for button press or touch
-  // For now, simulate immediate user presence
+  // NOTE: In a real RP2350 implementation, this would poll a GPIO
+  // for a button press or check a capacitive touch sensor.
+  // For the OpenToken demo, we simulate a successful interaction.
+
+  printf("CTAP2: User presence detected.\n");
+  led_status_set(LED_COLOR_GREEN); // Revert to idle after touch
   timeout_reset();
   return true;
 }

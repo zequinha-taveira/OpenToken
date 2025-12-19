@@ -1,5 +1,7 @@
 #include "oath_applet.h"
+#include "error_handling.h"
 #include "hsm_layer.h"
+#include "led_status.h"
 #include "storage.h"
 #include <stdio.h>
 #include <string.h>
@@ -59,19 +61,21 @@ static uint32_t oath_truncate(const uint8_t *hmac, uint8_t digits) {
 
 // Calculate TOTP code
 static bool calculate_totp(const storage_oath_entry_t *entry,
-                           uint32_t *code_out) {
-  // Get current time (simplified - in real implementation use RTC)
-  // For now, use a mock timestamp that increments
-  static uint32_t mock_time = 1640995200; // 2022-01-01 00:00:00 UTC
-  mock_time += 30;                        // Increment by 30 seconds each call
+                           const uint8_t *challenge, uint32_t *code_out) {
+  uint8_t local_challenge[8];
 
-  uint64_t time_step = mock_time / OATH_DEFAULT_PERIOD;
-
-  // Convert time step to big-endian 8-byte array
-  uint8_t challenge[8];
-  for (int i = 7; i >= 0; i--) {
-    challenge[i] = time_step & 0xFF;
-    time_step >>= 8;
+  // If no challenge provided, use mock time (fallback)
+  if (!challenge) {
+    // Get current time (simplified - in real implementation use RTC)
+    // For now, use a mock timestamp that increments
+    static uint32_t mock_time = 1640995200; // 2022-01-01 00:00:00 UTC
+    mock_time += 30;                        // Increment by 30 seconds each call
+    uint64_t time_step = mock_time / OATH_DEFAULT_PERIOD;
+    for (int i = 7; i >= 0; i--) {
+      local_challenge[i] = time_step & 0xFF;
+      time_step >>= 8;
+    }
+    challenge = local_challenge;
   }
 
   // Calculate HMAC-SHA1
@@ -230,7 +234,6 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
   }
 
   case OATH_INS_CALCULATE_ALL: {
-    // YubiKey Manager uses CALCULATE_ALL to get all TOTP codes at once
     printf("OATH Applet: CALCULATE_ALL Command - generating all TOTP codes.\n");
 
     storage_oath_entry_t entry;
@@ -242,7 +245,7 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
         // Only process TOTP accounts for CALCULATE_ALL
         if ((entry.prop & 0xF0) == OATH_TYPE_TOTP) {
           uint32_t code = 0;
-          if (calculate_totp(&entry, &code)) {
+          if (calculate_totp(&entry, NULL, &code)) {
             // Calculate response length needed
             uint8_t name_tlv_len = 2 + entry.name_len; // 71 + len + name
             uint8_t code_tlv_len = 7; // 76 + 5 + digits + 4-byte code
@@ -525,7 +528,13 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
       // TOTP calculation
       printf("OATH CALCULATE: Calculating TOTP for '%.*s'\n", name_len,
              name_buf);
-      calculation_success = calculate_totp(&entry, &code);
+      led_status_set(LED_COLOR_YELLOW); // Indicate OATH activity
+      calculation_success = calculate_totp(
+          &entry, (challenge_len == 8) ? challenge_buf : NULL, &code);
+
+      // Delay slightly to make sure the flash is visible if needed, then revert
+      sleep_ms(10);
+      led_status_set(LED_COLOR_GREEN);
     } else if ((entry.prop & 0xF0) == OATH_TYPE_HOTP) {
       // HOTP calculation - increment counter and save back
       printf("OATH CALCULATE: Calculating HOTP for '%.*s' (counter=%u)\n",
