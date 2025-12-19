@@ -45,6 +45,9 @@ bool storage_delete_fido2_cred(uint8_t index);
 bool storage_find_fido2_cred_by_rp(const uint8_t *rp_id_hash,
                                    storage_fido2_entry_t *out_entry,
                                    uint8_t *index_out);
+uint8_t storage_find_fido2_creds_all_by_rp(const uint8_t *rp_id_hash,
+                                           uint8_t *indices_out,
+                                           uint8_t max_indices);
 
 // HSM Key Storage
 #define STORAGE_HSM_MAX_KEYS 4
@@ -52,8 +55,8 @@ bool storage_find_fido2_cred_by_rp(const uint8_t *rp_id_hash,
 typedef struct {
   uint8_t pub_x[32];
   uint8_t pub_y[32];
-  uint8_t priv[32];  // Encrypted private key
-  uint8_t active;    // 1 if slot is used, 0 if empty
+  uint8_t priv[32]; // Encrypted private key
+  uint8_t active;   // 1 if slot is used, 0 if empty
 } storage_hsm_key_t;
 
 bool storage_load_hsm_key(uint8_t slot, storage_hsm_key_t *out_key);

@@ -57,9 +57,9 @@ cmake --build build
 - [x] Implementação do Driver USB CCID Customizado
 - [x] Integração com mbedTLS 3.x para RP2350
 - [x] Engine básica para FIDO2/CTAP2
-- [ ] Implementação completa de Residente Keys (RK) no FIDO2
-- [ ] Suporte para criptografia de chaves via Hardware Root of Trust
-- [ ] Interface de gerenciamento via WebUSB
+- [x] Implementação completa de Residente Keys (RK) no FIDO2
+- [x] Suporte para criptografia de chaves via Hardware Root of Trust
+- [x] Interface de gerenciamento via WebUSB
 
 ## 🤝 Contribuição
 

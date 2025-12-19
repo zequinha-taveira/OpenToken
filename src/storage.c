@@ -108,6 +108,22 @@ bool storage_find_fido2_cred_by_rp(const uint8_t *rp_id_hash,
   return false;
 }
 
+uint8_t storage_find_fido2_creds_all_by_rp(const uint8_t *rp_id_hash,
+                                           uint8_t *indices_out,
+                                           uint8_t max_indices) {
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < STORAGE_FIDO2_MAX_CREDS && count < max_indices; i++) {
+    if (g_cache.fido2_entries[i].active == 1 &&
+        memcmp(g_cache.fido2_entries[i].rp_id_hash, rp_id_hash, 32) == 0) {
+      if (indices_out) {
+        indices_out[count] = i;
+      }
+      count++;
+    }
+  }
+  return count;
+}
+
 void storage_init(void) {
   // Read flash into cache
   const uint8_t *flash_target_contents =

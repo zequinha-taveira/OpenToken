@@ -23,6 +23,7 @@ add_executable(${PROJECT_NAME}
     src/yubikey_mgmt.c
     src/error_handling.c
     src/ccid_device.c
+    src/webusb_handler.c
 )
 
 # Adiciona o diretório de includes
@@ -54,7 +55,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     CFG_TUD_CDC=0
     CFG_TUD_MSC=0
     CFG_TUD_MIDI=0
-    CFG_TUD_VENDOR=0
+    CFG_TUD_VENDOR=1
     CFG_TUD_USBTMC=0
     CFG_TUD_DFU_RUNTIME=0
     CFG_TUD_AUDIO=0

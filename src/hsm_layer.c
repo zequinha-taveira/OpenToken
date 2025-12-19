@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Pico SDK for Hardware Root of Trust
+#include "pico/unique_id.h"
+
 // mbedTLS Includes
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/ecdsa.h"
@@ -23,12 +26,31 @@ static mbedtls_entropy_context entropy;
 static mbedtls_ctr_drbg_context ctr_drbg;
 static bool is_init = false;
 
-// Simple XOR encryption key for private key storage (demo purposes)
-// In production, use proper key derivation and hardware security features
-static const uint8_t STORAGE_KEY[32] = {
-    0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56,
-    0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54,
-    0x32, 0x10, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF};
+// Hardware-backed encryption key derived from RP2350 unique ID
+static uint8_t g_derived_storage_key[32] = {0};
+static bool g_key_derived = false;
+
+// Derive a unique key for this specific hardware
+static void hsm_derive_hardware_key(void) {
+  if (g_key_derived)
+    return;
+
+  pico_unique_board_id_t board_id;
+  pico_get_unique_board_id(&board_id);
+
+  // Derive key using SHA-256 of the board ID + a fixed salt
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);
+  mbedtls_sha256_update(
+      &ctx, (const unsigned char *)"OpenToken-Hardened-Salt-v1", 26);
+  mbedtls_sha256_update(&ctx, board_id.id, 8);
+  mbedtls_sha256_finish(&ctx, g_derived_storage_key);
+  mbedtls_sha256_free(&ctx);
+
+  g_key_derived = true;
+  printf("HSM: Hardware-backed storage key derived successfully\n");
+}
 
 // Static wrapper prototypes
 static bool ensure_init_wrapper(void);
@@ -46,6 +68,10 @@ static void ensure_init(void) {
   const char *pers = "opentoken";
   mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
                         (const unsigned char *)pers, strlen(pers));
+
+  // Also derive the hardware key during initialization
+  hsm_derive_hardware_key();
+
   is_init = true;
 }
 
@@ -75,10 +101,13 @@ static bool ensure_init_wrapper(void) {
   return is_init;
 }
 
-// Simple XOR encryption/decryption for private key storage
+// Simple XOR encryption/decryption for private key storage using derived key
 static void encrypt_decrypt_key(const uint8_t *input, uint8_t *output) {
+  if (!g_key_derived) {
+    hsm_derive_hardware_key();
+  }
   for (int i = 0; i < 32; i++) {
-    output[i] = input[i] ^ STORAGE_KEY[i];
+    output[i] = input[i] ^ g_derived_storage_key[i];
   }
 }
 

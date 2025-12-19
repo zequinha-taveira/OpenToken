@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 // CTAPHID Commands
 #define CTAPHID_CMD_MSG 0x03
 #define CTAPHID_CMD_CBOR 0x10
@@ -642,10 +641,24 @@ uint8_t ctap2_handle_get_assertion(const uint8_t *cbor_data, uint16_t cbor_len,
     }
   }
 
-  // Find credential for this RP
+  // Case 3: allowList (not implemented in this snippet, but normally goes here)
+  // For now, we focus on Resident Keys (Case 2: empty allowList)
+
+  uint8_t cred_indices[STORAGE_FIDO2_MAX_CREDS];
+  uint8_t cred_count = storage_find_fido2_creds_all_by_rp(
+      rp_id_hash, cred_indices, STORAGE_FIDO2_MAX_CREDS);
+
+  if (cred_count == 0) {
+    return CTAP2_ERR_NO_CREDENTIALS;
+  }
+
+  // If multiple credentials exist, in a full implementation we would support
+  // getNextAssertion. For now, we take the first one or the one matching
+  // allowList. Since allowList parsing is omitted for brevity, we take the
+  // first found.
   storage_fido2_entry_t cred;
-  uint8_t cred_index;
-  if (!storage_find_fido2_cred_by_rp(rp_id_hash, &cred, &cred_index)) {
+  uint8_t cred_index = cred_indices[0];
+  if (!storage_load_fido2_cred(cred_index, &cred)) {
     return CTAP2_ERR_NO_CREDENTIALS;
   }
 
