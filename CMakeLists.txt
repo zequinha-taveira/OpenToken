@@ -30,6 +30,7 @@ add_executable(${PROJECT_NAME}
     src/ccid_device.c
     src/webusb_handler.c
     src/led_status.c
+    src/otp_keyboard.c
 )
 
 # Generate PIO header
@@ -59,7 +60,6 @@ pico_enable_stdio_uart(${PROJECT_NAME} 1)
 # USB Composite Device Configuration
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     # Enable required USB classes
-    CFG_TUD_HID=1
     CFG_TUD_CCID=1
     
     # Disable unused USB classes

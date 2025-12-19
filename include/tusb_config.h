@@ -17,13 +17,13 @@ extern "C" {
 // USB Class Configuration - Composite Device with HID + CCID
 #define CFG_TUD_CDC 0
 #define CFG_TUD_MSC 0
-#define CFG_TUD_HID 1 // FIDO2/CTAP2 Interface
+#define CFG_TUD_HID 2 // HID1: FIDO2/CTAP2, HID2: OTP Keyboard
 #define CFG_TUD_MIDI 0
 #define CFG_TUD_VENDOR 1 // WebUSB Management Interface
 #define CFG_TUD_CCID 1   // OATH/OpenPGP Interface
 
 //--------------------------------------------------------------------
-// HID INTERFACE CONFIGURATION (FIDO2/CTAP2)
+// HID INTERFACE CONFIGURATION (FIDO2/CTAP2 + KEYBOARD)
 //--------------------------------------------------------------------
 #define CFG_TUD_HID_EP_BUFSIZE 64
 #define CFG_TUD_HID_REPORT_DESC_LEN 34
@@ -48,7 +48,8 @@ extern "C" {
 // EP4: CCID OUT (APDU commands)
 // EP5: Vendor IN (WebUSB responses)
 // EP6: Vendor OUT (WebUSB commands)
-#define CFG_TUD_ENDPOINT_MAX 7
+// EP7: Keyboard IN (OTP)
+#define CFG_TUD_ENDPOINT_MAX 8
 #define CFG_TUD_TASK_QUEUE_LEN 16
 
 // HID Endpoint Numbers
@@ -62,6 +63,9 @@ extern "C" {
 // Vendor (WebUSB) Endpoint Numbers
 #define EPNUM_VENDOR_IN 0x83
 #define EPNUM_VENDOR_OUT 0x03
+
+// Keyboard Endpoint Numbers
+#define EPNUM_KEYBOARD_IN 0x84
 
 #ifdef __cplusplus
 }

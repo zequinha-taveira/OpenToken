@@ -43,6 +43,16 @@ Integrated a WS2812 RGB LED driver (GP22) to provide visual feedback for common 
 | 🔴 **Red** | **Error** | Critical Fault / Safe Mode |
 | 🟣 **White** | **Boot** | Power On / Initialization |
 
+## 🔌 Compatibilidade
+
+O OpenToken é projetado para seguir padrões abertos da indústria (FIDO2, CCID/ISO7816), o que garante compatibilidade com a maioria dos softwares:
+
+*   **Yubico Authenticator**: Funciona totalmente para **OATH (TOTP/HOTP)** via interface CCID (reconhecido como "OpenToken Project CCID").
+*   **FIDO2 WebAuthn**: Compatível com navegadores modernos (Chrome, Edge, Firefox) e contas Microsoft/Google.
+*   **GPG / Kleopatra**: Suporte via interface CCID OpenPGP.
+
+> **Nota**: Este projeto não é um clone de YubiKey e não utiliza identificadores (VID/PID) proprietários. A compatibilidade é obtida através da implementação rigorosa de protocolos padrão.
+
 ## 🛠️ Começando
 
 ### Pré-requisitos

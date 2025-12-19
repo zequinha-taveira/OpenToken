@@ -48,16 +48,93 @@ tusb_desc_device_t const desc_device = {
 //--------------------------------------------------------------------+
 // USB CONFIGURATION DESCRIPTOR
 //--------------------------------------------------------------------+
+//--------------------------------------------------------------------+
+// HID REPORT DESCRIPTOR (Keyboard)
+//--------------------------------------------------------------------+
+uint8_t const desc_hid_keyboard_report[] = {TUD_HID_REPORT_DESC_KEYBOARD()};
+
+//--------------------------------------------------------------------+
+// HID REPORT DESCRIPTOR (FIDO2/CTAP2)
+//--------------------------------------------------------------------+
+uint8_t const desc_hid_report[] = {
+    // FIDO Alliance HID Report Descriptor for CTAP2
+    0x06, 0xd0, 0xf1, // Usage Page (FIDO Alliance)
+    0x09, 0x01,       // Usage (CTAP HID)
+    0xa1, 0x01,       // Collection (Application)
+    0x09, 0x20,       //   Usage (Input Report Data)
+    0x15, 0x00,       //   Logical Minimum (0)
+    0x26, 0xff, 0x00, //   Logical Maximum (255)
+    0x75, 0x08,       //   Report Size (8)
+    0x95, 0x40,       //   Report Count (64)
+    0x81, 0x02,       //   Input (Data, Variable, Absolute)
+    0x09, 0x21,       //   Usage (Output Report Data)
+    0x15, 0x00,       //   Logical Minimum (0)
+    0x26, 0xff, 0x00, //   Logical Maximum (255)
+    0x75, 0x08,       //   Report Size (8)
+    0x95, 0x40,       //   Report Count (64)
+    0x91, 0x02,       //   Output (Data, Variable, Absolute)
+    0xc0              // End Collection
+};
+
+//--------------------------------------------------------------------+
+// USB STRING DESCRIPTORS
+//--------------------------------------------------------------------+
+char const *string_desc_arr[] = {
+    (const char[]){0x09, 0x04}, // 0: Language (English US)
+    "OpenToken Project",        // 1: Manufacturer (brand-neutral)
+    "FIDO2 Security Key",       // 2: Product (FIDO2 compatible description)
+    "000000000002",             // 3: Serial Number (Force re-enum)
+    "CCID Interface",           // 4: CCID Interface Description
+    "FIDO2 Interface",          // 5: HID Interface Description
+    "Management Interface",     // 6: Vendor Interface Description
+    "https://opentoken.io",     // 7: WebUSB Landing Page URL
+    "OTP Keyboard Interface"    // 8: Keyboard Interface Description
+};
+
+uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
+  (void)langid;
+  size_t chr_count;
+
+  if (index == 0) {
+    return (uint16_t *)string_desc_arr[0];
+  }
+
+  if (index >= sizeof(string_desc_arr) / sizeof(string_desc_arr[0]))
+    return NULL;
+
+  const char *str = string_desc_arr[index];
+
+  // Converte string C para string UTF-16LE
+  static uint16_t utf16_buf[32];
+  chr_count = strlen(str);
+  if (chr_count > 31)
+    chr_count = 31;
+
+  for (uint8_t i = 0; i < chr_count; i++) {
+    utf16_buf[i + 1] = str[i];
+  }
+
+  // Primeiro byte é o tamanho total (em bytes), segundo é o tipo
+  // (TUSB_DESC_STRING)
+  utf16_buf[0] = (TUSB_DESC_STRING << 8) | (2 * chr_count + 2);
+
+  return utf16_buf;
+}
+
+//--------------------------------------------------------------------+
+// USB CONFIGURATION DESCRIPTOR
+//--------------------------------------------------------------------+
 enum {
-  ITF_NUM_HID,    // Interface 0: HID (FIDO2/CTAP2)
-  ITF_NUM_CCID,   // Interface 1: CCID (OATH/OpenPGP)
-  ITF_NUM_VENDOR, // Interface 2: Vendor (WebUSB Management)
+  ITF_NUM_HID,      // Interface 0: HID (FIDO2/CTAP2)
+  ITF_NUM_CCID,     // Interface 1: CCID (OATH/OpenPGP)
+  ITF_NUM_VENDOR,   // Interface 2: Vendor (WebUSB Management)
+  ITF_NUM_KEYBOARD, // Interface 3: HID Keyboard (OTP)
   ITF_NUM_TOTAL
 };
 
 #define CONFIG_TOTAL_LEN                                                       \
   (TUD_CONFIG_DESC_LEN + TUD_HID_INOUT_DESC_LEN + TUD_CCID_DESC_LEN +          \
-   TUD_VENDOR_DESC_LEN)
+   TUD_VENDOR_DESC_LEN + TUD_HID_DESC_LEN)
 
 uint8_t const desc_configuration[] = {
     // Configuration Descriptor
@@ -72,9 +149,16 @@ uint8_t const desc_configuration[] = {
     TUD_CCID_DESCRIPTOR(ITF_NUM_CCID, 4, EPNUM_CCID_OUT, EPNUM_CCID_IN,
                         CFG_TUD_CCID_EP_BUFSIZE),
 
-    // Interface 2: Vendor (WebUSB Management)
+    // Interface 2: Vendor (WebUSB Management) - with interface string
+    // descriptor
     TUD_VENDOR_DESCRIPTOR(ITF_NUM_VENDOR, 6, EPNUM_VENDOR_OUT, EPNUM_VENDOR_IN,
-                          64)};
+                          64),
+
+    // Interface 3: HID Keyboard (OTP) - with interface string descriptor
+    // Use Boot Protocol (KEYBOARD) for maximum BIOS/OS compatibility
+    TUD_HID_DESCRIPTOR(ITF_NUM_KEYBOARD, 8, HID_ITF_PROTOCOL_KEYBOARD,
+                       sizeof(desc_hid_keyboard_report), EPNUM_KEYBOARD_IN,
+                       CFG_TUD_HID_EP_BUFSIZE, 10)};
 
 //--------------------------------------------------------------------+
 // BOS DESCRIPTOR (Required for WebUSB)
@@ -140,78 +224,15 @@ uint8_t const desc_ms_os_20[] = {
     'C', 0x00, '0', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00};
 
 //--------------------------------------------------------------------+
-// HID REPORT DESCRIPTOR (FIDO2/CTAP2)
-//--------------------------------------------------------------------+
-uint8_t const desc_hid_report[] = {
-    // FIDO Alliance HID Report Descriptor for CTAP2
-    0x06, 0xd0, 0xf1, // Usage Page (FIDO Alliance)
-    0x09, 0x01,       // Usage (CTAP HID)
-    0xa1, 0x01,       // Collection (Application)
-    0x09, 0x20,       //   Usage (Input Report Data)
-    0x15, 0x00,       //   Logical Minimum (0)
-    0x26, 0xff, 0x00, //   Logical Maximum (255)
-    0x75, 0x08,       //   Report Size (8)
-    0x95, 0x40,       //   Report Count (64)
-    0x81, 0x02,       //   Input (Data, Variable, Absolute)
-    0x09, 0x21,       //   Usage (Output Report Data)
-    0x15, 0x00,       //   Logical Minimum (0)
-    0x26, 0xff, 0x00, //   Logical Maximum (255)
-    0x75, 0x08,       //   Report Size (8)
-    0x95, 0x40,       //   Report Count (64)
-    0x91, 0x02,       //   Output (Data, Variable, Absolute)
-    0xc0              // End Collection
-};
-
-//--------------------------------------------------------------------+
-// USB STRING DESCRIPTORS
-//--------------------------------------------------------------------+
-char const *string_desc_arr[] = {
-    (const char[]){0x09, 0x04}, // 0: Language (English US)
-    "OpenToken Project",        // 1: Manufacturer (brand-neutral)
-    "FIDO2 Security Key",       // 2: Product (FIDO2 compatible description)
-    "000000000001",             // 3: Serial Number
-    "CCID Interface",           // 4: CCID Interface Description
-    "FIDO2 Interface",          // 5: HID Interface Description
-    "Management Interface",     // 6: Vendor Interface Description
-    "https://opentoken.io"      // 7: WebUSB Landing Page URL
-};
-
-uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
-  (void)langid;
-  size_t chr_count;
-
-  if (index == 0) {
-    return (uint16_t *)string_desc_arr[0];
-  }
-
-  if (index >= sizeof(string_desc_arr) / sizeof(string_desc_arr[0]))
-    return NULL;
-
-  const char *str = string_desc_arr[index];
-
-  // Converte string C para string UTF-16LE
-  static uint16_t utf16_buf[32];
-  chr_count = strlen(str);
-  if (chr_count > 31)
-    chr_count = 31;
-
-  for (uint8_t i = 0; i < chr_count; i++) {
-    utf16_buf[i + 1] = str[i];
-  }
-
-  // Primeiro byte é o tamanho total (em bytes), segundo é o tipo
-  // (TUSB_DESC_STRING)
-  utf16_buf[0] = (TUSB_DESC_STRING << 8) | (2 * chr_count + 2);
-
-  return utf16_buf;
-}
-
-//--------------------------------------------------------------------+
 // HID CALLBACKS
 //--------------------------------------------------------------------+
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
-  (void)instance;
-  return desc_hid_report;
+  if (instance == 0) {
+    return desc_hid_report; // FIDO2
+  } else if (instance == 1) {
+    return desc_hid_keyboard_report; // Keyboard
+  }
+  return NULL;
 }
 
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
@@ -228,13 +249,20 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
                            hid_report_type_t report_type, uint8_t const *buffer,
                            uint16_t bufsize) {
-  (void)instance;
-  (void)report_id;
-  (void)report_type;
-
-  // Process CTAP2/FIDO2 command received via USB HID
-  opentoken_process_ctap2_command((uint8_t *)buffer, bufsize);
+  // Only process CTAP2 on the FIDO2 interface (instance 0)
+  if (instance == 0) {
+    // Process CTAP2/FIDO2 command received via USB HID
+    opentoken_process_ctap2_command((uint8_t *)buffer, bufsize);
+  } else {
+    // Keyboard LED sets (Caps Lock, etc) - ignored
+    (void)report_id;
+    (void)report_type;
+    (void)buffer;
+    (void)bufsize;
+  }
 }
+
+// ... (rest of the file)
 
 //--------------------------------------------------------------------+
 // CCID CALLBACKS
