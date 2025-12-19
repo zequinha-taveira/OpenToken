@@ -1,16 +1,19 @@
-cmake_minimum_required(VERSION 3.13)
-
 # Configuração para o SDK do Raspberry Pi Pico (RP2040/RP2350)
 set(PICO_SDK_FETCH_FROM_GIT ON)
+
+# Add local boards directory - must be before pico_sdk_init
+list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+
 include(pico_sdk_init.cmake)
 
-project(opentoken_firmware C CXX)
-
-# Add local boards directory
-list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+# Initialize project with NONE to defer compiler detection until SDK is loaded
+project(opentoken_firmware NONE)
 
 # Inicializa o SDK
 pico_sdk_init()
+
+# Enable languages after SDK init (which sets up the toolchain)
+enable_language(C CXX ASM)
 
 # Adiciona o diretório de código fonte
 add_executable(${PROJECT_NAME}
