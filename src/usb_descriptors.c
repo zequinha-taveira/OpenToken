@@ -23,27 +23,27 @@
 //--------------------------------------------------------------------+
 // USB DEVICE DESCRIPTOR
 //--------------------------------------------------------------------+
-tusb_desc_device_t const desc_device = {.bLength = sizeof(tusb_desc_device_t),
-                                        .bDescriptorType = TUSB_DESC_DEVICE,
-                                        .bcdUSB = 0x0200, // USB 2.0
+tusb_desc_device_t const desc_device = {
+    .bLength = sizeof(tusb_desc_device_t),
+    .bDescriptorType = TUSB_DESC_DEVICE,
+    .bcdUSB = 0x0200, // USB 2.0
 
-                                        // Composite Device Configuration
-                                        .bDeviceClass = TUSB_CLASS_MISC,
-                                        .bDeviceSubClass = MISC_SUBCLASS_COMMON,
-                                        .bDeviceProtocol = MISC_PROTOCOL_IAD,
+    // Composite Device Configuration
+    .bDeviceClass = TUSB_CLASS_MISC,
+    .bDeviceSubClass = MISC_SUBCLASS_COMMON,
+    .bDeviceProtocol = MISC_PROTOCOL_IAD,
 
-                                        .bMaxPacketSize0 =
-                                            CFG_TUD_ENDPOINT0_SIZE,
+    .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
 
-                                        .idVendor = OPENTOKEN_VID,
-                                        .idProduct = OPENTOKEN_PID,
-                                        .bcdDevice = 0x0100, // Version 1.00
+    .idVendor = OPENTOKEN_VID,
+    .idProduct = OPENTOKEN_PID,
+    .bcdDevice = 0x0102, // Version 1.02 (Force re-enumeration)
 
-                                        .iManufacturer = 0x01,
-                                        .iProduct = 0x02,
-                                        .iSerialNumber = 0x03,
+    .iManufacturer = 0x01,
+    .iProduct = 0x02,
+    .iSerialNumber = 0x03,
 
-                                        .bNumConfigurations = 0x01};
+    .bNumConfigurations = 0x01};
 
 //--------------------------------------------------------------------+
 // USB CONFIGURATION DESCRIPTOR
@@ -252,8 +252,8 @@ void tud_ccid_icc_power_on_cb(uint8_t slot, uint8_t seq, uint32_t voltage) {
   (void)voltage;
 
   // Return ATR (Answer To Reset) - Standard OpenPGP/OATH card ATR
-  // 3B 80 01 80 4F 0C 4F 70 65 6E 54 6F 6B 65 6E 20 56 31 (Historical bytes:
-  // OpenToken V1)
+  // 3B 80 01 80 4F 0C 4F 70 65 6E 54 6F 6B 65 6E 20 56 31
+  // Using a more standard CCID ATR for better compatibility
   uint8_t atr[] = {0x3B, 0x80, 0x01, 0x80, 0x4F, 0x0C, 0x4F, 0x70, 0x65,
                    0x6E, 0x54, 0x6F, 0x6B, 0x65, 0x6E, 0x20, 0x56, 0x31};
   tud_ccid_icc_power_on_response(slot, seq, CCID_STATUS_SUCCESS, 0, atr,
