@@ -19,6 +19,8 @@ add_executable(${PROJECT_NAME}
     src/ccid_engine.c
     src/oath_applet.c
     src/openpgp_applet.c
+    src/yubikey_mgmt.c
+    src/error_handling.c
 )
 
 # Adiciona o diretório de includes
@@ -26,32 +28,47 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     include
 )
 
-# Configurações para o TinyUSB
-# Assume que o TinyUSB será adicionado como um submodule ou via pico_add_extra_dependency
-# Para simplificar, vamos apenas adicionar as bibliotecas necessárias para USB
+# TinyUSB Configuration for Composite Device
 target_link_libraries(${PROJECT_NAME}
     pico_stdlib
-    pico_cyw43_driver # Se for usar RP2350 com Wi-Fi
     tinyusb_device
+    tinyusb_board
     hardware_flash
-    pico_mbedtls # Crypto
+    hardware_sync
+    pico_mbedtls # Cryptographic operations
 )
 
-# Configurações de compilação
-pico_enable_stdio_usb(${PROJECT_NAME} 1)
+# Enable stdio over UART (not USB to avoid conflicts with our composite device)
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
 pico_enable_stdio_uart(${PROJECT_NAME} 1)
 
-# Define as interfaces USB (HID e CCID)
+# USB Composite Device Configuration
 target_compile_definitions(${PROJECT_NAME} PRIVATE
+    # Enable required USB classes
     CFG_TUD_HID=1
-    CFG_TUD_MSC=0
+    CFG_TUD_CCID=1
+    
+    # Disable unused USB classes
     CFG_TUD_CDC=0
+    CFG_TUD_MSC=0
     CFG_TUD_MIDI=0
     CFG_TUD_VENDOR=0
     CFG_TUD_USBTMC=0
     CFG_TUD_DFU_RUNTIME=0
-    CFG_TUD_CDC_ACM_LINE_CODING_SUPPORT=0
-    CFG_TUD_CCID=1 # Habilita a interface CCID para OATH/OpenPGP
+    CFG_TUD_AUDIO=0
+    CFG_TUD_VIDEO=0
+    CFG_TUD_NET=0
+    CFG_TUD_BTH=0
+    
+    # Endpoint configuration
+    CFG_TUD_ENDPOINT0_SIZE=64
+    
+    # HID Configuration
+    CFG_TUD_HID_EP_BUFSIZE=64
+    
+    # CCID Configuration  
+    CFG_TUD_CCID_EP_BUFSIZE=64
+    CFG_TUD_CCID_MAX_SLOTS=1
 )
 
 # Adiciona o arquivo UF2 para upload fácil
