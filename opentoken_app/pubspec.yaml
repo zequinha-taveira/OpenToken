@@ -13,7 +13,7 @@ dependencies:
   provider: ^6.0.5
   crypto: ^3.0.3
   opentoken_dart:
-    path: ../libraries/opentoken-dart
+    path: c:/OpenToken/libraries/opentoken-dart
 
 dev_dependencies:
   flutter_test:

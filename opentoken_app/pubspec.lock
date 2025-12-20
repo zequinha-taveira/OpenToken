@@ -203,8 +203,8 @@ packages:
   opentoken_dart:
     dependency: "direct main"
     description:
-      path: "../libraries/opentoken-dart"
-      relative: true
+      path: "c:/OpenToken/libraries/opentoken-dart"
+      relative: false
     source: path
     version: "1.0.0"
   path:

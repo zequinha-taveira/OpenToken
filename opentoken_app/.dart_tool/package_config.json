@@ -159,7 +159,7 @@
     },
     {
       "name": "opentoken_dart",
-      "rootUri": "../../libraries/opentoken-dart",
+      "rootUri": "file:///c:/OpenToken/libraries/opentoken-dart",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },

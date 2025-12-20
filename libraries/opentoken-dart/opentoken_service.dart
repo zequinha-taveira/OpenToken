@@ -1,87 +1,105 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Shared OATH Service for OpenToken (Cross-Platform)
-/// This class contains the PURE LOGIC for the OATH protocol.
-/// It creates APDUs and parses status words regardless of the underlying transport (NFC/USB).
+/// Interface for physical communication with the OpenToken device.
+/// Can be implemented for NFC (Mobile) or USB (Desktop/Web).
+abstract class OpenTokenTransport {
+  Future<Uint8List> sendApdu(Uint8List apdu);
+  Future<Uint8List> sendCtapHid(int command, Uint8List payload);
+}
+
+/// Shared Protocol Service for OpenToken (Cross-Platform)
 class OpenTokenSharedService {
-  static const List<int> OATH_AID = [0xA0, 0x00, 0x00, 0x05, 0x27, 0x21, 0x01, 0x01];
+  final OpenTokenTransport transport;
 
-  /// --- APDU Factory Methods ---
+  static const List<int> OATH_AID = [
+    0xA0,
+    0x00,
+    0x00,
+    0x05,
+    0x27,
+    0x21,
+    0x01,
+    0x01
+  ];
+  static const int CTAP2_CMD_GET_INFO = 0x04;
+  static const int CTAP2_CMD_CRED_MGMT = 0x41;
 
-  /// Builds the SELECT applet command
-  Uint8List selectApplet() {
-    return Uint8List.fromList([
-      0x00, 0xA4, 0x04, 0x00, 
-      OATH_AID.length, 
-      ...OATH_AID
-    ]);
+  OpenTokenSharedService(this.transport);
+
+  /// --- OATH Operations ---
+
+  /// Connects to the OATH applet
+  Future<bool> selectOathApplet() async {
+    final apdu = Uint8List.fromList(
+        [0x00, 0xA4, 0x04, 0x00, OATH_AID.length, ...OATH_AID]);
+    final resp = await transport.sendApdu(apdu);
+    return resp.length >= 2 && resp[resp.length - 2] == 0x90;
   }
 
-  /// Builds the LIST accounts command
-  Uint8List listAccounts() {
-    return Uint8List.fromList([0x00, 0xA1, 0x00, 0x00, 0x00]);
+  /// Lists OATH accounts
+  Future<List<Map<String, String>>> listOathAccounts() async {
+    final apdu = Uint8List.fromList([0x00, 0xA1, 0x00, 0x00, 0x00]);
+    final resp = await transport.sendApdu(apdu);
+    return _parseAccountList(resp);
   }
 
-  /// Builds the CALCULATE code command for a specific account
-  Uint8List calculateCode(String accountName) {
+  /// Calculates a TOTP code
+  Future<String?> calculateCode(String accountName) async {
     final nameBytes = utf8.encode(accountName);
-    // Format: CLA INS P1 P2 Lc [Tag 0x71, Len, NameData] [Le 0x00]
-    return Uint8List.fromList([
-      0x00, 0xA2, 0x00, 0x01, 
-      nameBytes.length + 2, 
-      0x71, nameBytes.length, 
-      ...nameBytes, 
+    final apdu = Uint8List.fromList([
+      0x00,
+      0xA2,
+      0x00,
+      0x01,
+      nameBytes.length + 2,
+      0x71,
+      nameBytes.length,
+      ...nameBytes,
       0x00
     ]);
+    final resp = await transport.sendApdu(apdu);
+
+    if (resp.length >= 5 && resp[resp.length - 2] == 0x90) {
+      // Parse 0x76 0x05 0x06 [4 bytes code]
+      final code = (resp[3] << 24) | (resp[4] << 16) | (resp[5] << 8) | resp[6];
+      return (code % 1000000).toString().padLeft(6, '0');
+    }
+    return null;
   }
 
-  /// Builds the ADD (PUT) account command
-  Uint8List addAccount(String name, List<int> secretKey, {bool isTotp = true}) {
-    final nameBytes = utf8.encode(name);
-    final property = isTotp ? 0x21 : 0x11; // TOTP-SHA1 vs HOTP-SHA1
+  /// --- FIDO2 Operations ---
 
-    final data = [
-      0x71, nameBytes.length, ...nameBytes,     // Tag 0x71: Name
-      0x73, secretKey.length, ...secretKey,     // Tag 0x73: Key
-      0x75, 0x01, property                      // Tag 0x75: Property
-    ];
-
-    return Uint8List.fromList([
-      0x00, 0x01, 0x00, 0x00, 
-      data.length,
-      ...data
-    ]);
+  /// Retrieves Authenticator Info
+  Future<Map<dynamic, dynamic>?> getFidoInfo() async {
+    // CTAP2_GET_INFO = 0x04
+    final resp = await transport.sendCtapHid(CTAP2_CMD_GET_INFO, Uint8List(0));
+    // Implementation would require a CBOR decoder in Dart
+    return null; // Placeholder until CBOR is added
   }
 
-  /// --- Response Parsing Logic ---
+  /// --- Helper Parsers ---
 
-  /// Simplistic TLV parser for account lists
-  List<Map<String, String>> parseAccountList(Uint8List response) {
+  List<Map<String, String>> _parseAccountList(Uint8List response) {
     final List<Map<String, String>> result = [];
     int i = 0;
-    while (i < response.length - 2) { // Subtract 2 for SW1 SW2
-      if (response[i] == 0x72) { // Name List Tag
+    while (i < response.length - 2) {
+      if (response[i] == 0x72) {
         int len = response[i + 1];
-        int start = i + 2;
-        int end = start + len;
-        
-        // Parse inner TLV (71 Name, 75 Prop)
+        int j = i + 2;
+        int end = j + len;
         String? name;
         String type = "TOTP";
-        
-        int j = start;
         while (j < end) {
-            int tag = response[j];
-            int tagLen = response[j+1];
-            if (tag == 0x71) {
-              name = utf8.decode(response.sublist(j + 2, j + 2 + tagLen));
-            } else if (tag == 0x75) {
-              type = (response[j + 2] & 0x20 != 0) ? "TOTP" : "HOTP";
-            }
-            j += 2 + tagLen;
+          int tag = response[j];
+          int tagLen = response[j + 1];
+          if (tag == 0x71) {
+            name = utf8.decode(response.sublist(j + 2, j + 2 + tagLen));
+          } else if (tag == 0x75) {
+            type = (response[j + 2] & 0x20 != 0) ? "TOTP" : "HOTP";
+          }
+          j += 2 + tagLen;
         }
-        
         if (name != null) result.add({"name": name, "type": type});
         i += 2 + len;
       } else {
