@@ -1,17 +1,19 @@
+/*
+ * OpenToken NATIVO - Official Firmware
+ * Copyright (c) 2025 OpenToken Project
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
 #include "ccid_engine.h"
 #include "error_handling.h"
 #include "oath_applet.h"
 #include "openpgp_applet.h"
-#include "yubikey_mgmt.h"
 #include <stdio.h>
 #include <string.h>
-
 
 // Global state for selected applet
 static ccid_applet_t current_applet = APPLET_NONE;
 
 // Forward declarations for static wrapper functions
-static bool yubikey_mgmt_process_apdu_wrapper(void *context);
 static bool oath_applet_process_apdu_wrapper(void *context);
 static bool openpgp_applet_process_apdu_wrapper(void *context);
 
@@ -132,13 +134,6 @@ bool ccid_select_applet_by_aid(const uint8_t *aid, uint8_t aid_len) {
     return false;
   }
 
-  // Try YubiKey Manager compatibility layer first
-  if (yubikey_mgmt_select(aid, aid_len)) {
-    current_applet = APPLET_YUBIKEY_MGMT;
-    printf("CCID Engine: YubiKey Manager compatibility layer selected\n");
-    return true;
-  }
-
   // Try OATH applet selection
   if (oath_applet_select(aid, aid_len)) {
     current_applet = APPLET_OATH;
@@ -241,23 +236,6 @@ void opentoken_process_ccid_apdu(uint8_t const *buffer, uint16_t len,
   }
 
   switch (current_applet) {
-  case APPLET_YUBIKEY_MGMT:
-    printf("CCID Engine: Routing to YubiKey Manager compatibility layer\n");
-    if (!retry_operation_with_context(
-            (bool (*)(void *))yubikey_mgmt_process_apdu_wrapper, &(struct {
-              const uint8_t *buf;
-              uint16_t len;
-              uint8_t *out;
-              uint16_t *out_len;
-            }){buffer, len, out_buffer, out_len},
-            &RETRY_CONFIG_PROTOCOL)) {
-      ERROR_REPORT_ERROR(ERROR_PROTOCOL_SEQUENCE_ERROR,
-                         "YubiKey Manager APDU processing failed");
-      protocol_send_error_response_ccid(out_buffer, out_len,
-                                        SW_CONDITIONS_NOT_SATISFIED);
-    }
-    break;
-
   case APPLET_OATH:
     printf("CCID Engine: Routing to OATH applet\n");
     if (!retry_operation_with_context(
@@ -303,18 +281,6 @@ void opentoken_process_ccid_apdu(uint8_t const *buffer, uint16_t len,
 
   timeout_reset();
   printf("CCID Engine: Response generated (%d bytes)\n", *out_len);
-}
-
-// Wrapper functions for retry mechanism compatibility
-static bool yubikey_mgmt_process_apdu_wrapper(void *context) {
-  struct {
-    const uint8_t *buf;
-    uint16_t len;
-    uint8_t *out;
-    uint16_t *out_len;
-  } *ctx = context;
-  yubikey_mgmt_process_apdu(ctx->buf, ctx->len, ctx->out, ctx->out_len);
-  return true; // YubiKey manager always succeeds or handles errors internally
 }
 
 static bool oath_applet_process_apdu_wrapper(void *context) {

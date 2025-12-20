@@ -1,3 +1,8 @@
+/*
+ * OpenToken NATIVO - Official Firmware
+ * Copyright (c) 2025 OpenToken Project
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
 #include "ccid_device.h"
 #include "opentoken.h"
 #include "tusb.h"
@@ -81,8 +86,8 @@ uint8_t const desc_hid_report[] = {
 //--------------------------------------------------------------------+
 char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04}, // 0: Language (English US)
-    "OpenToken Project",        // 1: Manufacturer (brand-neutral)
-    "FIDO2 Security Key",       // 2: Product (FIDO2 compatible description)
+    "OpenToken Project",        // 1: Manufacturer
+    "OpenToken NATIVO",         // 2: Product
     "000000000002",             // 3: Serial Number (Force re-enum)
     "CCID Interface",           // 4: CCID Interface Description
     "FIDO2 Interface",          // 5: HID Interface Description
@@ -279,11 +284,10 @@ void tud_ccid_icc_power_on_cb(uint8_t slot, uint8_t seq, uint32_t voltage) {
   // ICC (smartcard) power on - simulate successful power on
   (void)voltage;
 
-  // Return ATR (Answer To Reset) - Standard OpenPGP/OATH card ATR
-  // 3B 80 01 80 4F 0C 4F 70 65 6E 54 6F 6B 65 6E 20 56 31
-  // Using a more standard CCID ATR for better compatibility
-  uint8_t atr[] = {0x3B, 0x80, 0x01, 0x80, 0x4F, 0x0C, 0x4F, 0x70, 0x65,
-                   0x6E, 0x54, 0x6F, 0x6B, 0x65, 0x6E, 0x20, 0x56, 0x31};
+  // Return ATR (Answer To Reset) - Standard OpenToken NATIVO ATR
+  // 3B 80 01 80 43 4E 41 54 49 56 4F 30 31 (Example NATIVO ATR)
+  uint8_t atr[] = {0x3B, 0x80, 0x01, 0x80, 0x43, 0x4E, 0x41,
+                   0x54, 0x49, 0x56, 0x4F, 0x30, 0x31};
   tud_ccid_icc_power_on_response(slot, seq, CCID_STATUS_SUCCESS, 0, atr,
                                  sizeof(atr));
 }

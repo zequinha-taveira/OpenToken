@@ -1,3 +1,8 @@
+/*
+ * OpenToken NATIVO - Official Firmware
+ * Copyright (c) 2025 OpenToken Project
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
 #ifndef OPENTOKEN_H
 #define OPENTOKEN_H
 

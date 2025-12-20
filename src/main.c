@@ -1,3 +1,8 @@
+/*
+ * OpenToken NATIVO - Official Firmware
+ * Copyright (c) 2025 OpenToken Project
+ * Licensed under the MIT License. See LICENSE file for details.
+ */
 #include "bsp/board.h"
 #include "pico/stdlib.h"
 #include "tusb.h"
@@ -12,7 +17,6 @@
 #include "openpgp_applet.h"
 #include "opentoken.h"
 #include "storage.h"
-#include "yubikey_mgmt.h"
 
 // Helper function for tusb_init (which is a macro in modern TinyUSB)
 // to satisfy retry_operation's function pointer requirement
@@ -30,9 +34,6 @@ void tud_mount_cb(void) {
 
   // Update USB stability tracking
   usb_stability_update_state(USB_STATE_CONNECTED);
-
-  // Handle YubiKey Manager compatibility layer reconnection
-  yubikey_mgmt_handle_reconnection();
 }
 
 void tud_umount_cb(void) {
@@ -107,9 +108,6 @@ int main() {
   // Initialize protocol engines
   ctap2_engine_init();
   ccid_engine_init();
-
-  // Initialize YubiKey Manager compatibility layer
-  yubikey_mgmt_init_compatibility_layer();
 
   // Initialize applets
   openpgp_applet_init();

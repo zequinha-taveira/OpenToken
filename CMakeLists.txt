@@ -25,7 +25,6 @@ add_executable(${PROJECT_NAME}
     src/ccid_engine.c
     src/oath_applet.c
     src/openpgp_applet.c
-    src/yubikey_mgmt.c
     src/error_handling.c
     src/ccid_device.c
     src/webusb_handler.c

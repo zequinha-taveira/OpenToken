@@ -4,10 +4,10 @@
   # OpenToken
   ### *Universal Security & Interoperability Firmware for RP2350*
 
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/zequinha-taveira/OpenToken)
-  [![Platform](https://img.shields.io/badge/platform-RP2350-blue)](https://www.raspberrypi.com/documentation/microcontrollers/rp2350.html)
-  [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
-  [![Protocol](https://img.shields.io/badge/protocol-FIDO2%2C%20OATH%2C%20OpenPGP-blueviolet)](#-funcionalidades)
+   [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
+   [![Protocol](https://img.shields.io/badge/protocol-FIDO2%2C%20OATH%2C%20OpenPGP-blueviolet)](#-funcionalidades)
+   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/zequinha-taveira/OpenToken)
+   [![Eco](https://img.shields.io/badge/ecosystem-NATIVO-red)](#-opentoken-nativo)
 
   ---
 </div>
@@ -27,7 +27,7 @@ O OpenToken foi projetado com uma filosofia de *Security by Design*, dividindo o
 | Funcionalidade | Descrição | Protocolo |
 | :--- | :--- | :--- |
 | **FIDO2 / U2F** | Autenticação moderna sem senha e 2FA para web. | CTAP2 / HID |
-| **OATH TOTP/HOTP** | Gerador de códigos para 2FA compatível com Yubico. | CCID / ISO7816 |
+| **OATH TOTP/HOTP** | Gerador de códigos 2FA nativo e soberano. | CCID / ISO7816 |
 | **OpenPGP** | Suporte para chaves PGP (Assinatura, Criptografia, Auth). | CCID / ISO7816 |
 | **HSM Abstraction** | Camada unificada para operações RSA/ECC seguras. | mbedTLS 3.x |
 | **Custom CCID** | Driver USB CCID de alto desempenho otimizado para o RP2350. | USB Device |
@@ -47,11 +47,12 @@ Integrated a WS2812 RGB LED driver (GP22) to provide visual feedback for common 
 
 O OpenToken é projetado para seguir padrões abertos da indústria (FIDO2, CCID/ISO7816), o que garante compatibilidade com a maioria dos softwares:
 
-*   **Yubico Authenticator**: Funciona totalmente para **OATH (TOTP/HOTP)** via interface CCID (reconhecido como "OpenToken Project CCID").
+*   **OpenToken NATIVO App**: Experiência oficial e otimizada para Desktop e Mobile.
 *   **FIDO2 WebAuthn**: Compatível com navegadores modernos (Chrome, Edge, Firefox) e contas Microsoft/Google.
+*   **Standard OATH Tools**: Funciona com qualquer ferramenta baseada em padrões abertos.
 *   **GPG / Kleopatra**: Suporte via interface CCID OpenPGP.
 
-> **Nota**: Este projeto não é um clone de YubiKey e não utiliza identificadores (VID/PID) proprietários. A compatibilidade é obtida através da implementação rigorosa de protocolos padrão.
+> **Nota**: Projeto 100% NATIVO. Não utilizamos identificadores proprietários ou emulação de marcas de terceiros. A soberania é obtida através de protocolos abertos.
 
 ## 🛠️ Começando
 

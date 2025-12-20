@@ -19,16 +19,16 @@ class OpenTokenApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OpenToken Sovereign',
+      title: 'OpenToken NATIVO',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFF00A3FF),
-        scaffoldBackgroundColor: const Color(0xFF0A0A0C),
+        primaryColor: const Color(0xFFBC00FF), // Electric Purple
+        scaffoldBackgroundColor: const Color(0xFF050505),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00A3FF),
-          secondary: Color(0xFF00A3FF),
-          surface: Color(0xFF161618),
+          primary: Color(0xFFBC00FF),
+          secondary: Color(0xFF00F0FF), // Cyan
+          surface: Color(0xFF121214),
         ),
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
@@ -97,15 +97,15 @@ class _MainNavigationState extends State<MainNavigation> {
                       destinations: const [
                         NavigationRailDestination(
                             icon: Icon(Icons.security_outlined),
-                            selectedIcon: Icon(Icons.security, color: Color(0xFF00A3FF)),
+                            selectedIcon: Icon(Icons.security, color: Color(0xFFBC00FF)),
                             label: Text('OATH')),
                         NavigationRailDestination(
                             icon: Icon(Icons.fingerprint_outlined),
-                            selectedIcon: Icon(Icons.fingerprint, color: Color(0xFF00A3FF)),
+                            selectedIcon: Icon(Icons.fingerprint, color: Color(0xFFBC00FF)),
                             label: Text('FIDO2')),
                         NavigationRailDestination(
                             icon: Icon(Icons.settings_outlined),
-                            selectedIcon: Icon(Icons.settings, color: Color(0xFF00A3FF)),
+                            selectedIcon: Icon(Icons.settings, color: Color(0xFFBC00FF)),
                             label: Text('Settings')),
                       ],
                     ),
@@ -292,7 +292,7 @@ class _OathViewState extends State<_OathView> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          "Sovereign OATH",
+          "OpenToken NATIVO",
           style: GoogleFonts.inter(fontWeight: FontWeight.bold),
         ),
         actions: [
