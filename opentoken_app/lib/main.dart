@@ -55,7 +55,8 @@ class _MainNavigationState extends State<MainNavigation> {
   late OpenTokenSharedService _service;
   bool _isConnected = false;
   String _transportName = "Unknown";
-  
+  String _firmwareVersion = "v1.0.0-mock";
+
   // Mock data for OATH
   List<Map<String, String>> _accounts = [
     {"name": "GitHub:zequinha", "type": "TOTP"},
@@ -81,7 +82,26 @@ class _MainNavigationState extends State<MainNavigation> {
     _transportName = isMobile ? "NFC" : "USB";
     _service = OpenTokenSharedService(transport);
     // In a real scenario, this would be reactive to hotplug
-    setState(() => _isConnected = true); 
+    setState(() => _isConnected = true);
+    _fetchFirmwareInfo();
+  }
+
+  Future<void> _fetchFirmwareInfo() async {
+    if (_isConnected) {
+      final version = await _service.getFirmwareVersion();
+      setState(() {
+        _firmwareVersion = "v$version";
+      });
+    }
+  }
+
+  Future<void> _triggerReboot() async {
+    if (_isConnected) {
+      final success = await _service.enterBootloaderMode();
+      if (success) {
+        setState(() => _isConnected = false);
+      }
+    }
   }
 
   void _startTimer() {
@@ -98,7 +118,9 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _refreshCodes() {
     for (var acc in _accounts) {
-      final mockCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+      final mockCode =
+          (100000 + (DateTime.now().millisecondsSinceEpoch % 900000))
+              .toString();
       setState(() {
         _codes[acc["name"]!] = mockCode;
       });
@@ -141,7 +163,9 @@ class _MainNavigationState extends State<MainNavigation> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.01),
-                        border: Border(left: BorderSide(color: Colors.white.withOpacity(0.05))),
+                        border: Border(
+                            left: BorderSide(
+                                color: Colors.white.withOpacity(0.05))),
                       ),
                       child: _buildCurrentPage(),
                     ),
@@ -157,14 +181,19 @@ class _MainNavigationState extends State<MainNavigation> {
           ? null
           : NavigationBar(
               selectedIndex: _selectedIndex,
-              onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+              onDestinationSelected: (idx) =>
+                  setState(() => _selectedIndex = idx),
               backgroundColor: const Color(0xFF0A0A0C),
               indicatorColor: OpenTokenTheme.electricPurple.withOpacity(0.2),
               destinations: const [
-                NavigationDestination(icon: Icon(Icons.security), label: 'Credenciais'),
-                NavigationDestination(icon: Icon(Icons.fingerprint), label: 'Cripto'),
-                NavigationDestination(icon: Icon(Icons.info_outline), label: 'Dispositivo'),
-                NavigationDestination(icon: Icon(Icons.settings), label: 'Configurações'),
+                NavigationDestination(
+                    icon: Icon(Icons.security), label: 'Credenciais'),
+                NavigationDestination(
+                    icon: Icon(Icons.fingerprint), label: 'Cripto'),
+                NavigationDestination(
+                    icon: Icon(Icons.info_outline), label: 'Dispositivo'),
+                NavigationDestination(
+                    icon: Icon(Icons.settings), label: 'Configurações'),
               ],
             ),
     );
@@ -182,7 +211,11 @@ class _MainNavigationState extends State<MainNavigation> {
       case 1:
         return const CryptoManagementView();
       case 2:
-        return const DeviceStatusView();
+        return DeviceStatusView(
+          firmwareVersion: _firmwareVersion,
+          isConnected: _isConnected,
+          onReboot: _triggerReboot,
+        );
       case 3:
         return const SettingsView();
       default:
@@ -196,35 +229,52 @@ class _MainNavigationState extends State<MainNavigation> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
         color: const Color(0xFF050505),
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+        border:
+            Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
       ),
       child: Row(
         children: [
-          const Icon(Icons.shield, color: OpenTokenTheme.electricPurple, size: 28),
+          const Icon(Icons.shield,
+              color: OpenTokenTheme.electricPurple, size: 28),
           const SizedBox(width: 12),
           Text(
             "OpenToken Authenticator",
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+            style: GoogleFonts.inter(
+                fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _isConnected ? const Color(0xFF00F0FF).withOpacity(0.1) : Colors.red.withOpacity(0.1),
+              color: _isConnected
+                  ? const Color(0xFF00F0FF).withOpacity(0.1)
+                  : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _isConnected ? const Color(0xFF00F0FF).withOpacity(0.2) : Colors.red.withOpacity(0.2)),
+              border: Border.all(
+                  color: _isConnected
+                      ? const Color(0xFF00F0FF).withOpacity(0.2)
+                      : Colors.red.withOpacity(0.2)),
             ),
             child: Row(
               children: [
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(color: _isConnected ? const Color(0xFF00F0FF) : Colors.red, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                      color:
+                          _isConnected ? const Color(0xFF00F0FF) : Colors.red,
+                      shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _isConnected ? "Dispositivo: Conectado (RP2350)" : "Dispositivo: Desconectado",
-                  style: GoogleFonts.inter(color: _isConnected ? const Color(0xFF00F0FF) : Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                  _isConnected
+                      ? "Dispositivo: Conectado (RP2350)"
+                      : "Dispositivo: Desconectado",
+                  style: GoogleFonts.inter(
+                      color:
+                          _isConnected ? const Color(0xFF00F0FF) : Colors.red,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -281,7 +331,10 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       child: Row(
         children: [
-          _FooterItem(icon: Icons.usb, label: "USB: ${_isConnected ? 'OK' : 'ERRO'}", color: _isConnected ? const Color(0xFF00F0FF) : Colors.red),
+          _FooterItem(
+              icon: Icons.usb,
+              label: "USB: ${_isConnected ? 'OK' : 'ERRO'}",
+              color: _isConnected ? const Color(0xFF00F0FF) : Colors.red),
           const SizedBox(width: 24),
           _FooterItem(icon: Icons.code, label: "FW: V0.3.1-BETA"),
           const SizedBox(width: 24),
@@ -321,7 +374,8 @@ class _SidebarItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected ? OpenTokenTheme.electricPurple : Colors.white38,
+                color:
+                    isSelected ? OpenTokenTheme.electricPurple : Colors.white38,
                 size: 20,
               ),
               const SizedBox(width: 16),
@@ -338,7 +392,9 @@ class _SidebarItem extends StatelessWidget {
                 Container(
                   width: 4,
                   height: 4,
-                  decoration: const BoxDecoration(color: OpenTokenTheme.electricPurple, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                      color: OpenTokenTheme.electricPurple,
+                      shape: BoxShape.circle),
                 ),
               ],
             ],

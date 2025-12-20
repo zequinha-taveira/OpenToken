@@ -25,6 +25,10 @@ class OpenTokenSharedService {
   static const int CTAP2_CMD_GET_INFO = 0x04;
   static const int CTAP2_CMD_CRED_MGMT = 0x41;
 
+  // Management Commands (Proprietary/WebUSB)
+  static const int MGMT_CMD_GET_VERSION = 0x01;
+  static const int MGMT_CMD_REBOOT_BOOTLOADER = 0x06;
+
   OpenTokenSharedService(this.transport);
 
   /// --- OATH Operations ---
@@ -76,6 +80,33 @@ class OpenTokenSharedService {
     final resp = await transport.sendCtapHid(CTAP2_CMD_GET_INFO, Uint8List(0));
     // Implementation would require a CBOR decoder in Dart
     return null; // Placeholder until CBOR is added
+  }
+
+  /// --- Management Operations ---
+
+  /// Gets the firmware version from the device
+  Future<String> getFirmwareVersion() async {
+    try {
+      final resp =
+          await transport.sendCtapHid(MGMT_CMD_GET_VERSION, Uint8List(0));
+      if (resp.length >= 4 && resp[0] == 0x00) {
+        return "${resp[1]}.${resp[2]}.${resp[3]}";
+      }
+    } catch (e) {
+      return "Unknown";
+    }
+    return "Unknown";
+  }
+
+  /// Triggers a reboot into BOOTSEL mode
+  Future<bool> enterBootloaderMode() async {
+    try {
+      final resp =
+          await transport.sendCtapHid(MGMT_CMD_REBOOT_BOOTLOADER, Uint8List(0));
+      return resp.isNotEmpty && resp[0] == 0x00;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// --- Helper Parsers ---

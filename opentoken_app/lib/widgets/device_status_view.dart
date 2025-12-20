@@ -2,7 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DeviceStatusView extends StatelessWidget {
-  const DeviceStatusView({super.key});
+  final String firmwareVersion;
+  final bool isConnected;
+  final VoidCallback onReboot;
+
+  const DeviceStatusView({
+    super.key,
+    required this.firmwareVersion,
+    required this.isConnected,
+    required this.onReboot,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -95,8 +104,12 @@ class DeviceStatusView extends StatelessWidget {
                               fontWeight: FontWeight.bold,
                               color: Colors.white)),
                       const SizedBox(width: 12),
-                      const Icon(Icons.check_circle,
-                          color: Color(0xFF00F0FF), size: 20),
+                      Icon(
+                        isConnected ? Icons.check_circle : Icons.error,
+                        color:
+                            isConnected ? const Color(0xFF00F0FF) : Colors.red,
+                        size: 20,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -124,7 +137,7 @@ class DeviceStatusView extends StatelessWidget {
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      _buildInfoItem("VERSÃO DO FIRMWARE", "v1.0.4-stable",
+                      _buildInfoItem("VERSÃO DO FIRMWARE", firmwareVersion,
                           isLatest: true),
                       const SizedBox(width: 64),
                       _buildInfoItem(
@@ -241,6 +254,7 @@ class DeviceStatusView extends StatelessWidget {
             "Esta ação apagará todos os segredos, chaves e dados de configuração do elemento seguro. Esta ação não pode ser desfeita.",
             "Limpar Dispositivo",
             Icons.delete_forever,
+            () {},
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24.0),
@@ -248,17 +262,18 @@ class DeviceStatusView extends StatelessWidget {
           ),
           _buildDangerItem(
             "Gravação Manual de Firmware",
-            "Upload de um arquivo binário .uf2 customizado para o dispositivo. Certifique-se de que o binário está assinado por uma autoridade confiável.",
-            "Selecionar Arquivo",
+            "Reinicia o dispositivo em modo BOOTSEL para permitir a gravação de um novo arquivo .uf2.",
+            "Entrar em BOOTSEL",
             Icons.upload_file,
+            onReboot,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDangerItem(
-      String title, String description, String buttonLabel, IconData icon) {
+  Widget _buildDangerItem(String title, String description, String buttonLabel,
+      IconData icon, VoidCallback onPressed) {
     return Row(
       children: [
         Expanded(
@@ -279,7 +294,7 @@ class DeviceStatusView extends StatelessWidget {
         ),
         const SizedBox(width: 48),
         OutlinedButton.icon(
-          onPressed: () {},
+          onPressed: onPressed,
           icon: Icon(icon, size: 18),
           label: Text(buttonLabel),
           style: OutlinedButton.styleFrom(

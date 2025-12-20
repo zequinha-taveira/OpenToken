@@ -6,6 +6,7 @@
  * browsers to communicate with the OpenToken device for credential management.
  */
 
+#include "pico/bootrom.h"
 #include "storage.h"
 #include "tusb.h"
 #include <stdbool.h>
@@ -13,12 +14,14 @@
 #include <stdio.h>
 #include <string.h>
 
+
 // WebUSB Management Commands
 #define WEBUSB_CMD_GET_VERSION 0x01
 #define WEBUSB_CMD_LIST_CREDS 0x02
 #define WEBUSB_CMD_DELETE_CRED 0x03
 #define WEBUSB_CMD_GET_STATUS 0x04
 #define WEBUSB_CMD_RESET_DEVICE 0x05
+#define WEBUSB_CMD_REBOOT_BOOTLOADER 0x06
 #define WEBUSB_CMD_LIST_OATH 0x10
 #define WEBUSB_CMD_DELETE_OATH 0x11
 
@@ -172,12 +175,24 @@ static void handle_delete_oath(uint8_t slot_id) {
  */
 static void handle_reset_device(void) {
   printf("WebUSB: Received global reset command\n");
-  if (storage_reset_device()) {
-    webusb_response[0] = WEBUSB_STATUS_OK;
-  } else {
-    webusb_response[0] = WEBUSB_STATUS_ERROR;
-  }
   webusb_response_len = 1;
+}
+
+/**
+ * @brief Handle REBOOT_BOOTLOADER command - Reboot to BOOTSEL mode
+ */
+static void handle_reboot_bootloader(void) {
+  printf("WebUSB: Rebooting to BOOTSEL mode...\n");
+  // Use status byte to acknowledge before rebooting
+  webusb_response[0] = WEBUSB_STATUS_OK;
+  webusb_response_len = 1;
+
+  // Flush and delay slightly to ensure response is sent
+  tud_vendor_write(webusb_response, webusb_response_len);
+  tud_vendor_flush();
+
+  // Reboot into BOOTSEL mode (Pico SDK)
+  reset_usb_boot(0, 0);
 }
 
 /**
@@ -233,6 +248,10 @@ void opentoken_webusb_rx_cb(uint8_t const *buffer, uint16_t bufsize) {
   case WEBUSB_CMD_RESET_DEVICE:
     handle_reset_device();
     break;
+
+  case WEBUSB_CMD_REBOOT_BOOTLOADER:
+    handle_reboot_bootloader();
+    return; // Don't send response twice
 
   default:
     printf("WebUSB: Unknown command 0x%02X\n", cmd);
