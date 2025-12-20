@@ -1,5 +1,6 @@
 build*/
-lib/
+/lib/
+!opentoken_app/lib/
 *.elf
 *.bin
 *.uf2
