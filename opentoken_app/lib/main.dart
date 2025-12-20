@@ -379,24 +379,26 @@ class _SidebarItem extends StatelessWidget {
                 size: 20,
               ),
               const SizedBox(width: 16),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  color: isSelected ? Colors.white : Colors.white38,
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    color: isSelected ? Colors.white : Colors.white38,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isSelected) ...[
-                const Spacer(),
+              if (isSelected)
                 Container(
                   width: 4,
                   height: 4,
+                  margin: const EdgeInsets.only(left: 8),
                   decoration: const BoxDecoration(
                       color: OpenTokenTheme.electricPurple,
                       shape: BoxShape.circle),
                 ),
-              ],
             ],
           ),
         ),
