@@ -18,7 +18,7 @@ class DeviceStatusView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Device Status",
+                    "Status do Dispositivo",
                     style: GoogleFonts.inter(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -26,7 +26,7 @@ class DeviceStatusView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Target: OpenToken RP2350 Secure Element",
+                    "Alvo: Elemento Seguro OpenToken RP2350",
                     style:
                         GoogleFonts.inter(color: Colors.white54, fontSize: 14),
                   ),
@@ -35,7 +35,7 @@ class DeviceStatusView extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text("Check Updates"),
+                label: const Text("Verificar Atualizações"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF007BFF),
                   foregroundColor: Colors.white,
@@ -106,7 +106,7 @@ class DeviceStatusView extends StatelessWidget {
                     decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(4)),
-                    child: Text("Production Hardware",
+                    child: Text("Hardware de Produção",
                         style: GoogleFonts.inter(
                             color: Colors.white38,
                             fontSize: 10,
@@ -115,20 +115,20 @@ class DeviceStatusView extends StatelessWidget {
                   const SizedBox(height: 32),
                   Row(
                     children: [
-                      _buildInfoItem("SERIAL NUMBER", "OT-8821-X99-A01"),
+                      _buildInfoItem("NÚMERO DE SÉRIE", "OT-8821-X99-A01"),
                       const SizedBox(width: 64),
                       _buildInfoItem(
-                          "MCU ARCHITECTURE", "RP2350 (RISC-V / ARM)"),
+                          "ARQUITETURA MCU", "RP2350 (RISC-V / ARM)"),
                     ],
                   ),
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      _buildInfoItem("FIRMWARE VERSION", "v1.0.4-stable",
+                      _buildInfoItem("VERSÃO DO FIRMWARE", "v1.0.4-stable",
                           isLatest: true),
                       const SizedBox(width: 64),
                       _buildInfoItem(
-                          "PROTOCOL SUPPORT", "FIDO2 / U2F / OTP / PIV"),
+                          "SUPORTE A PROTOCOLO", "FIDO2 / U2F / OTP / PIV"),
                     ],
                   ),
                 ],
@@ -165,7 +165,7 @@ class DeviceStatusView extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: const Color(0xFF00F0FF).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4)),
-                child: const Text("Latest",
+                child: const Text("Mais Recente",
                     style: TextStyle(
                         color: Color(0xFF00F0FF),
                         fontSize: 8,
@@ -188,12 +188,12 @@ class DeviceStatusView extends StatelessWidget {
               children: [
                 const Icon(Icons.storage, color: Colors.white38, size: 16),
                 const SizedBox(width: 8),
-                Text("Secure Flash Storage (Encrypted)",
+                Text("Armazenamento Flash Seguro (Criptografado)",
                     style:
                         GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
               ],
             ),
-            Text("128KB / 2MB Used",
+            Text("128KB / 2MB Utilizado",
                 style: GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
           ],
         ),
@@ -228,7 +228,7 @@ class DeviceStatusView extends StatelessWidget {
               const Icon(Icons.warning_amber_rounded,
                   color: Colors.redAccent, size: 24),
               const SizedBox(width: 12),
-              Text("Danger Zone",
+              Text("Zona de Perigo",
                   style: GoogleFonts.inter(
                       color: Colors.redAccent,
                       fontSize: 18,
@@ -237,9 +237,9 @@ class DeviceStatusView extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           _buildDangerItem(
-            "Factory Reset",
-            "This action will wipe all secrets, keys, and configuration data from the secure element. This action cannot be undone.",
-            "Wipe Device",
+            "Reset de Fábrica",
+            "Esta ação apagará todos os segredos, chaves e dados de configuração do elemento seguro. Esta ação não pode ser desfeita.",
+            "Limpar Dispositivo",
             Icons.delete_forever,
           ),
           const Padding(
@@ -247,9 +247,9 @@ class DeviceStatusView extends StatelessWidget {
             child: Divider(color: Colors.white10),
           ),
           _buildDangerItem(
-            "Manual Firmware Flash",
-            "Upload a custom .uf2 binary file to the device. Ensure the binary is signed by a trusted authority.",
-            "Select File",
+            "Gravação Manual de Firmware",
+            "Upload de um arquivo binário .uf2 customizado para o dispositivo. Certifique-se de que o binário está assinado por uma autoridade confiável.",
+            "Selecionar Arquivo",
             Icons.upload_file,
           ),
         ],

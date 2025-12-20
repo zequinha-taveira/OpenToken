@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:opentoken_dart/opentoken_service.dart';
+import 'package:opentoken_dart/transports/transport_nfc.dart';
+import 'package:opentoken_dart/transports/transport_usb.dart';
+import 'dart:io';
 import 'dart:async';
 
 import 'theme.dart';
@@ -48,6 +52,9 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
   bool _isAddingCredential = false;
+  late OpenTokenSharedService _service;
+  bool _isConnected = false;
+  String _transportName = "Unknown";
   
   // Mock data for OATH
   List<Map<String, String>> _accounts = [
@@ -63,8 +70,18 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    _initializeService();
     _startTimer();
     _refreshCodes();
+  }
+
+  void _initializeService() {
+    final bool isMobile = Platform.isAndroid || Platform.isIOS;
+    final transport = isMobile ? NfcTransport() : UsbTransport();
+    _transportName = isMobile ? "NFC" : "USB";
+    _service = OpenTokenSharedService(transport);
+    // In a real scenario, this would be reactive to hotplug
+    setState(() => _isConnected = true); 
   }
 
   void _startTimer() {
@@ -144,94 +161,12 @@ class _MainNavigationState extends State<MainNavigation> {
               backgroundColor: const Color(0xFF0A0A0C),
               indicatorColor: OpenTokenTheme.electricPurple.withOpacity(0.2),
               destinations: const [
-                NavigationDestination(icon: Icon(Icons.security), label: 'Credentials'),
-                NavigationDestination(icon: Icon(Icons.fingerprint), label: 'Crypto'),
-                NavigationDestination(icon: Icon(Icons.info_outline), label: 'Device'),
-                NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+                NavigationDestination(icon: Icon(Icons.security), label: 'Credenciais'),
+                NavigationDestination(icon: Icon(Icons.fingerprint), label: 'Cripto'),
+                NavigationDestination(icon: Icon(Icons.info_outline), label: 'Dispositivo'),
+                NavigationDestination(icon: Icon(Icons.settings), label: 'Configurações'),
               ],
             ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF050505),
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.shield, color: OpenTokenTheme.electricPurple, size: 28),
-          const SizedBox(width: 12),
-          Text(
-            "OpenToken Authenticator",
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF00F0FF).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF00F0FF).withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(color: Color(0xFF00F0FF), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  "Device: Connected (RP2350)",
-                  style: GoogleFonts.inter(color: const Color(0xFF00F0FF), fontSize: 11, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          const Icon(Icons.lock_outline, color: Colors.white38, size: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar() {
-    return Container(
-      width: 240,
-      color: const Color(0xFF050505),
-      child: Column(
-        children: [
-          const SizedBox(height: 24),
-          _SidebarItem(
-            icon: Icons.security_outlined,
-            label: "Credentials",
-            isSelected: _selectedIndex == 0,
-            onTap: () => setState(() => _selectedIndex = 0),
-          ),
-          _SidebarItem(
-            icon: Icons.fingerprint_outlined,
-            label: "Crypto",
-            isSelected: _selectedIndex == 1,
-            onTap: () => setState(() => _selectedIndex = 1),
-          ),
-          _SidebarItem(
-            icon: Icons.info_outline,
-            label: "Device Status",
-            isSelected: _selectedIndex == 2,
-            onTap: () => setState(() => _selectedIndex = 2),
-          ),
-          _SidebarItem(
-            icon: Icons.settings_outlined,
-            label: "Settings",
-            isSelected: _selectedIndex == 3,
-            onTap: () => setState(() => _selectedIndex = 3),
-          ),
-        ],
-      ),
     );
   }
 
@@ -255,6 +190,87 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
+  Widget _buildTopBar() {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF050505),
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield, color: OpenTokenTheme.electricPurple, size: 28),
+          const SizedBox(width: 12),
+          Text(
+            "OpenToken Authenticator",
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isConnected ? const Color(0xFF00F0FF).withOpacity(0.1) : Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _isConnected ? const Color(0xFF00F0FF).withOpacity(0.2) : Colors.red.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: _isConnected ? const Color(0xFF00F0FF) : Colors.red, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isConnected ? "Dispositivo: Conectado (RP2350)" : "Dispositivo: Desconectado",
+                  style: GoogleFonts.inter(color: _isConnected ? const Color(0xFF00F0FF) : Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Icon(Icons.lock_outline, color: Colors.white38, size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 240,
+      color: const Color(0xFF050505),
+      child: Column(
+        children: [
+          _SidebarItem(
+            icon: Icons.security_outlined,
+            label: "Credenciais",
+            isSelected: _selectedIndex == 0,
+            onTap: () => setState(() => _selectedIndex = 0),
+          ),
+          _SidebarItem(
+            icon: Icons.fingerprint_outlined,
+            label: "Criptografia",
+            isSelected: _selectedIndex == 1,
+            onTap: () => setState(() => _selectedIndex = 1),
+          ),
+          _SidebarItem(
+            icon: Icons.info_outline,
+            label: "Status do Dispositivo",
+            isSelected: _selectedIndex == 2,
+            onTap: () => setState(() => _selectedIndex = 2),
+          ),
+          _SidebarItem(
+            icon: Icons.settings_outlined,
+            label: "Configurações",
+            isSelected: _selectedIndex == 3,
+            onTap: () => setState(() => _selectedIndex = 3),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFooter() {
     return Container(
       height: 32,
@@ -265,15 +281,15 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       child: Row(
         children: [
-          _FooterItem(icon: Icons.usb, label: "USB: OK", color: const Color(0xFF00F0FF)),
+          _FooterItem(icon: Icons.usb, label: "USB: ${_isConnected ? 'OK' : 'ERRO'}", color: _isConnected ? const Color(0xFF00F0FF) : Colors.red),
           const SizedBox(width: 24),
           _FooterItem(icon: Icons.code, label: "FW: V0.3.1-BETA"),
           const SizedBox(width: 24),
-          _FooterItem(icon: Icons.terminal, label: "PROTOCOL: V1.0"),
+          _FooterItem(icon: Icons.terminal, label: "PROTOCOLO: V1.0"),
           const Spacer(),
           _FooterItem(icon: Icons.battery_charging_full, label: "BAT: 98%"),
           const SizedBox(width: 24),
-          _FooterItem(label: "SERIAL: RP-2350-XJ92"),
+          _FooterItem(label: "SÉRIE: RP-2350-XJ92"),
         ],
       ),
     );
