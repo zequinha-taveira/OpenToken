@@ -2,6 +2,13 @@ import sys
 import usb.core
 import usb.util
 import base64
+import time
+import struct
+try:
+    import cbor2
+except ImportError:
+    # Fallback or alert user
+    cbor2 = None
 from smartcard.System import readers
 from smartcard.util import toBytes
 
@@ -10,11 +17,20 @@ OPENTOKEN_VID = 0x1209
 OPENTOKEN_PID = 0x0001
 OATH_AID = [0xA0, 0x00, 0x00, 0x05, 0x27, 0x21, 0x01, 0x01]
 
+# CTAP2 Constants
+CTAPHID_CMD_MSG = 0x03
+CTAPHID_CMD_CBOR = 0x10
+CTAPHID_CMD_INIT = 0x06
+CTAPHID_INIT_FLAG = 0x80
+
+CTAP2_CMD_GET_INFO = 0x04
+CTAP2_CMD_CRED_MGMT = 0x41
+
 class OpenTokenDevice:
     """Represents a connected OpenToken device."""
-    def __init__(self, serial=None):
+    def __init__(self, usb_dev=None, serial=None):
         self.serial = serial
-        self.usb_dev = None
+        self.usb_dev = usb_dev
         self.sc_reader = None
 
     def __repr__(self):
@@ -25,13 +41,11 @@ class OpenTokenSDK:
     def list_devices():
         """Finds all connected OpenToken devices by VID."""
         devices = []
-        # Find via USB (for WebUSB/Management)
+        # Find via USB (for FIDO2/Management)
         usb_devices = usb.core.find(find_all=True, idVendor=OPENTOKEN_VID)
         for dev in usb_devices:
-            # We don't strictly check PID here to allow future variations
             serial = dev.serial_number if dev.serial_number else "Unknown"
-            ot_dev = OpenTokenDevice(serial=serial)
-            ot_dev.usb_dev = dev
+            ot_dev = OpenTokenDevice(usb_dev=dev, serial=serial)
             devices.append(ot_dev)
         return devices
 
@@ -154,3 +168,100 @@ class OATHClient:
         DEL_APDU = [0x00, 0x02, 0x00, 0x00, len(DATA)] + DATA
         data, sw1, sw2 = self.connection.transmit(DEL_APDU)
         return sw1 == 0x90
+
+class CTAP2Client:
+    """Handles CTAPHID communication with the CTAP2 engine."""
+    def __init__(self, device):
+        self.device = device
+        self.cid = 0xFFFFFFFF
+        self.interface = 0
+        self.endpoint_out = None
+        self.endpoint_in = None
+
+    def connect(self):
+        """Prepares USB HID endpoints and performs CTAPHID_INIT."""
+        if not self.device.usb_dev:
+            raise Exception("Device does not have a USB attachment")
+        
+        dev = self.device.usb_dev
+        # Detach kernel driver if needed
+        try:
+            if dev.is_kernel_driver_active(self.interface):
+                dev.detach_kernel_driver(self.interface)
+        except:
+            pass
+
+        # Use the first configuration
+        dev.set_configuration()
+        cfg = dev.get_active_configuration()
+        intf = cfg[(self.interface, 0)]
+
+        self.endpoint_out = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
+        self.endpoint_in = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
+
+        if not self.endpoint_out or not self.endpoint_in:
+            raise Exception("HID endpoints not found")
+
+        # Initialize Channel ID
+        nonce = list(range(8))
+        init_pkt = struct.pack(">I B H", 0xFFFFFFFF, CTAPHID_CMD_INIT | CTAPHID_INIT_FLAG, 8) + bytes(nonce)
+        init_pkt = init_pkt.ljust(64, b'\x00')
+        
+        self.endpoint_out.write(init_pkt)
+        resp = self.endpoint_in.read(64)
+        
+        # Parse INIT response: Nonce(8), CID(4), ProtocolVersion(1), Versions(3), Capabilities(1)
+        r_nonce = resp[7:15]
+        if r_nonce != bytes(nonce):
+            raise Exception("CTAPHID_INIT nonce mismatch")
+        
+        self.cid = struct.unpack(">I", resp[15:19])[0]
+        return True
+
+    def send_cbor(self, cmd, data_dict=None):
+        """Sends a CTAP2 command with CBOR payload and returns the response."""
+        if cbor2 is None:
+            raise Exception("cbor2 library is required for CTAP2 operations")
+
+        payload = bytes([cmd])
+        if data_dict is not None:
+            payload += cbor2.dumps(data_dict)
+
+        # Message fragmentation (simplified for small packets)
+        msg_len = len(payload)
+        pkt = struct.pack(">I B H", self.cid, CTAPHID_CMD_CBOR | CTAPHID_INIT_FLAG, msg_len) + payload
+        pkt = pkt.ljust(64, b'\x00')
+        
+        self.endpoint_out.write(pkt)
+        
+        # Read response (simplified - assuming single packet for now)
+        resp = self.endpoint_in.read(64)
+        # cid(4), cmd(1), len(2), status(1), cbor(...)
+        r_len = (resp[5] << 8) | resp[6]
+        r_status = resp[7]
+        
+        if r_status != 0x00:
+            return {"status": r_status}
+
+        if r_len > 1:
+            return {"status": 0x00, "data": cbor2.loads(resp[8:8+r_len-1])}
+        return {"status": 0x00}
+
+    def get_info(self):
+        return self.send_cbor(CTAP2_CMD_GET_INFO)
+
+    def list_fido2_credentials(self, pin=None):
+        """Lists Resident Keys using Credential Management (requires PIN if set)."""
+        # 1. Enumerate RPs
+        # Command 0x41, Subcommand 0x01 (enumerateRPsBegin)
+        resp = self.send_cbor(CTAP2_CMD_CRED_MGMT, {0x01: 0x01})
+        if resp["status"] != 0:
+            return []
+        
+        rps = []
+        # In a full implementation, we would loop with enumerateRPsNext (0x02)
+        # For OpenToken demo, assuming small number of RPs
+        if "data" in resp and 0x03 in resp["data"]:
+            rps.append(resp["data"][0x03]) # RP
+            
+        return rps

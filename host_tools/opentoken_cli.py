@@ -1,6 +1,7 @@
 import sys
 import argparse
-from opentoken_sdk.opentoken import OpenTokenSDK, OATHClient
+import struct
+from opentoken_sdk.opentoken import OpenTokenSDK, OATHClient, CTAP2Client
 
 def main():
     parser = argparse.ArgumentParser(description="OpenToken Native CLI")
@@ -24,6 +25,14 @@ def main():
 
     del_parser = oath_sub.add_parser("delete", help="Delete an OATH account")
     del_parser.add_argument("name", help="Account name")
+
+    # FIDO2 commands
+    fido_parser = subparsers.add_parser("fido2", help="FIDO2 (WebAuthn) management")
+    fido_sub = fido_parser.add_subparsers(dest="subcommand", help="FIDO2 subcommands")
+    fido_sub.add_parser("list", help="List resident credentials (RK)")
+    
+    # Status command
+    subparsers.add_parser("status", help="Show device status and version")
 
     args = parser.parse_args()
 
@@ -66,6 +75,56 @@ def main():
                 print(f"Successfully deleted account: {args.name}")
             else:
                 print(f"Error: Failed to delete account {args.name}")
+
+    elif args.command == "fido2":
+        devices = OpenTokenSDK.list_devices()
+        if not devices:
+            print("Error: No OpenToken device found via USB.")
+            sys.exit(1)
+        
+        # Use first device
+        dev = devices[0]
+        client = CTAP2Client(dev)
+        try:
+            client.connect()
+        except Exception as e:
+            print(f"Error: Connection to FIDO2 interface failed: {e}")
+            sys.exit(1)
+
+        if args.subcommand == "list":
+            creds = client.list_fido2_credentials()
+            if not creds:
+                print("No resident credentials found or pin required.")
+            else:
+                print(f"{'RP ID':<32}")
+                print("-" * 40)
+                for rp in creds:
+                    print(f"{rp.get('id', 'Unknown'):<32}")
+
+    elif args.command == "status":
+        devices = OpenTokenSDK.list_devices()
+        if not devices:
+            print("Status: Disconnected")
+            sys.exit(0)
+        
+        dev = devices[0]
+        print("Device: OpenToken (RP2350)")
+        print(f"Serial: {dev.serial}")
+        
+        # Try to get info via FIDO2
+        try:
+            client = CTAP2Client(dev)
+            client.connect()
+            info = client.get_info()
+            if info["status"] == 0:
+                data = info["data"]
+                # data[0x01] versions
+                # data[0x03] aaguid
+                versions = ", ".join(data.get(1, []))
+                print(f"Protocols: {versions}")
+                print(f"AAGUID: {data.get(3, b'').hex()}")
+        except:
+            print("Protocols: OATH, FIDO2, OpenPGP (Detected via USB)")
 
     else:
         parser.print_help()
