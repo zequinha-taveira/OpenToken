@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:opentoken_dart/opentoken_service.dart';
-import 'package:opentoken_dart/lib/transports/transport_nfc.dart';
-import 'package:opentoken_dart/lib/transports/transport_usb.dart';
+import 'package:opentoken_dart/transports/transport_nfc.dart';
+import 'package:opentoken_dart/transports/transport_usb.dart';
 
 void main() {
   runApp(const OpenTokenApp());
