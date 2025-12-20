@@ -13,7 +13,7 @@ graph TD
 
     subgraph Host_Tools ["FERRAMENTAS HOST"]
         direction TB
-        Auth[Yubico Auth]:::host
+        Auth[OpenToken NATIVO Auth]:::host
         Browser[Navegador]:::host
         GPG[GnuPG/OpenSC]:::host
         TextEditor[Editor de Texto]:::host

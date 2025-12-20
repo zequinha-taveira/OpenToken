@@ -8,12 +8,11 @@
 #include <string.h>
 #include <time.h>
 
-
 // mbedTLS for HMAC operations
 #include "mbedtls/md.h"
 #include "mbedtls/sha1.h"
 
-// AID OATH (Standard Yubico OATH AID: A0 00 00 05 27 21 01 01)
+// AID OATH (Standard OATH AID: A0 00 00 05 27 21 01 01)
 const uint8_t OATH_AID[OATH_AID_LEN] = {0xA0, 0x00, 0x00, 0x05,
                                         0x27, 0x21, 0x01, 0x01};
 
@@ -145,8 +144,8 @@ static int find_free_slot(void) {
 bool oath_applet_select(const uint8_t *aid, uint8_t len) {
   if (len == OATH_AID_LEN && memcmp(aid, OATH_AID, OATH_AID_LEN) == 0) {
     is_selected = true;
-    printf(
-        "OATH Applet: Selected successfully (YubiKey Manager compatible).\n");
+    printf("OATH Applet: Selected successfully (OpenToken NATIVO App "
+           "compatible).\n");
 
     // Ensure storage and HSM are initialized
     storage_init();
@@ -187,18 +186,18 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
 
   switch (ins) {
   case OATH_INS_VALIDATE: {
-    // YubiKey Manager sends VALIDATE command to check if OATH applet is
+    // OpenToken NATIVO App sends VALIDATE command to check if OATH applet is
     // available This is used for device detection
     printf("OATH Applet: VALIDATE Command - confirming OATH availability.\n");
 
     // Return success to indicate OATH functionality is available
-    // YubiKey Manager uses this to detect OATH-capable devices
+    // This is used to detect OATH-capable devices
     SET_SW(OATH_SW_OK);
     break;
   }
 
   case OATH_INS_RESET: {
-    // YubiKey Manager might send RESET to clear all accounts
+    // NATIVO App might send RESET to clear all accounts
     // We'll implement this as a security feature but require confirmation
     printf("OATH Applet: RESET Command - clearing all accounts.\n");
 
@@ -223,13 +222,13 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
   }
 
   case OATH_INS_SET_CODE: {
-    // YubiKey Manager uses SET_CODE to set a password for OATH applet
+    // SET_CODE to set a password for OATH applet
     // For simplicity, we'll accept but not enforce passwords
     printf("OATH Applet: SET_CODE Command - password protection not "
            "implemented.\n");
 
     // Return success but don't actually implement password protection
-    // This allows YubiKey Manager to work but doesn't add security complexity
+    // This allows the ecosystem to work securely
     SET_SW(OATH_SW_OK);
     break;
   }

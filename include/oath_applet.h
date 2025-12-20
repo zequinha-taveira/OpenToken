@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Application Identifier (AID) para OATH (Yubico)
+// Application Identifier (AID) para OATH (Padrão)
 #define OATH_AID_LEN 8
 extern const uint8_t OATH_AID[OATH_AID_LEN];
 

@@ -10,7 +10,7 @@ from smartcard.util import toBytes
 OPENTOKEN_VID = 0x1209
 OPENTOKEN_PID = 0x0001
 
-# OATH Application Identifier (Standard Yubico OATH AID)
+# OATH Application Identifier (Standard OATH AID)
 OATH_AID = [0xA0, 0x00, 0x00, 0x05, 0x27, 0x21, 0x01, 0x01]
 
 class OpenTokenDevice:
