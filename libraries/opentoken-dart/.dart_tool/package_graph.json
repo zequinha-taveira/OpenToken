@@ -1,0 +1,41 @@
+{
+  "roots": [
+    "opentoken_dart"
+  ],
+  "packages": [
+    {
+      "name": "opentoken_dart",
+      "version": "1.0.0",
+      "dependencies": [
+        "crypto",
+        "meta"
+      ],
+      "devDependencies": []
+    },
+    {
+      "name": "crypto",
+      "version": "3.0.7",
+      "dependencies": [
+        "typed_data"
+      ]
+    },
+    {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
+      "name": "meta",
+      "version": "1.17.0",
+      "dependencies": []
+    },
+    {
+      "name": "collection",
+      "version": "1.19.1",
+      "dependencies": []
+    }
+  ],
+  "configVersion": 1
+}

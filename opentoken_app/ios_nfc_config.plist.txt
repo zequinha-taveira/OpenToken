@@ -1,0 +1,10 @@
+<!-- Adicione estas chaves ao seu ios/Runner/Info.plist -->
+
+<key>NFCReaderUsageDescription</key>
+<string>Precisamos de acesso ao NFC para comunicar com o seu OpenToken.</string>
+
+<key>com.apple.developer.nfc.readersession.iso7816.select-identifiers</key>
+<array>
+    <!-- OATH AID -->
+    <string>A000000527210101</string>
+</array>

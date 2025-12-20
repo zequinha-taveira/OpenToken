@@ -1,0 +1,11 @@
+name: opentoken_dart
+description: Official Shared Dart SDK for OpenToken (Mobile & Desktop)
+version: 1.0.0
+homepage: https://github.com/zequinha-taveira/OpenToken
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  meta: ^1.11.0
+  crypto: ^3.0.3

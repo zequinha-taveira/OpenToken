@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'services/opentoken_service.dart';
+import 'package:opentoken_dart/opentoken_dart.dart';
 
 void main() {
   runApp(const OpenTokenApp());

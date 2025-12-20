@@ -1,0 +1,9 @@
+<!-- Adicione isto ao seu AndroidManifest.xml dentro da tag <manifest> -->
+<uses-permission android:name="android.permission.NFC" />
+<uses-feature android:name="android.hardware.nfc" android:required="false" />
+
+<!-- E dentro da tag <application> -->
+<intent-filter>
+    <action android:name="android.nfc.action.TAG_DISCOVERED" />
+    <category android:name="android.intent.category.DEFAULT" />
+</intent-filter>
