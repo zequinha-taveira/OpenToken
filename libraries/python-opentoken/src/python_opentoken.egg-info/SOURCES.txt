@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/opentoken/__init__.py
+src/opentoken/core.py
+src/python_opentoken.egg-info/PKG-INFO
+src/python_opentoken.egg-info/SOURCES.txt
+src/python_opentoken.egg-info/dependency_links.txt
+src/python_opentoken.egg-info/requires.txt
+src/python_opentoken.egg-info/top_level.txt
