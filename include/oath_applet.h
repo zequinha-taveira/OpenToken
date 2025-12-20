@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 // Application Identifier (AID) para OATH (Yubico)
 #define OATH_AID_LEN 8
 extern const uint8_t OATH_AID[OATH_AID_LEN];
@@ -50,5 +49,6 @@ extern const uint8_t OATH_AID[OATH_AID_LEN];
 bool oath_applet_select(const uint8_t *aid, uint8_t len);
 void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
                               uint8_t *response, uint16_t *response_len);
+bool oath_applet_calculate_default(char *code_out_str);
 
 #endif // OATH_APPLET_H

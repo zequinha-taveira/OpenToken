@@ -1,6 +1,10 @@
 #include "bsp/board.h"
+#include "hardware/gpio.h"
+#include "led_status.h" // For LED feedback
+#include "pico/stdlib.h"
 #include "tusb.h"
 #include <ctype.h>
+#include <stdio.h>
 
 // Helper to convert ASCII to HID Scancode (US Layout)
 static uint8_t char_to_hid_code(char c, bool *shift) {
@@ -133,10 +137,51 @@ void otp_keyboard_type(const char *text) {
 
 // Handler for calculating and typing OTP
 // This should be called when "Touch" is detected if configured for OTP
-void otp_keyboard_task(void) {
-  // Placeholder: Check button state (debounced)
-  // If pressed long enough -> Get Default OTP Slot -> Calculate -> Type
+#define BUTTON_PIN PICO_DEFAULT_USER_BUTTON_PIN
+static uint32_t last_button_press = 0;
+static bool button_was_pressed = false;
 
-  // Example usage (triggered elsewhere):
-  // otp_keyboard_type("123456");
+// Need to include oath_applet.h for calculation
+#include "oath_applet.h"
+
+void otp_keyboard_init(void) {
+#ifdef BUTTON_PIN
+  gpio_init(BUTTON_PIN);
+  gpio_set_dir(BUTTON_PIN, GPIO_IN);
+  gpio_pull_up(BUTTON_PIN); // Assumes generic active-low button (pull to GND)
+#endif
+}
+
+void otp_keyboard_task(void) {
+#ifdef BUTTON_PIN
+  // Simple debounce logic
+  bool button_pressed = !gpio_get(BUTTON_PIN); // Active Low
+  uint32_t now = to_ms_since_boot(get_absolute_time());
+
+  if (button_pressed && !button_was_pressed) {
+    if (now - last_button_press >
+        1000) { // 1s debounce to prevent accidental double type
+      printf("OpenToken: Button pressed! Calculating Real OTP...\n");
+
+      // Blink LED to indicate processing
+      led_status_set(LED_COLOR_PURPLE);
+
+      char otp_string[8];
+      if (oath_applet_calculate_default(otp_string)) {
+        printf("OpenToken: Typing code %s\n", otp_string);
+        otp_keyboard_type(otp_string);
+        otp_keyboard_type("\n");         // Enter
+        led_status_set(LED_COLOR_GREEN); // Success
+      } else {
+        printf("OpenToken: No OATH account found!\n");
+        led_status_set(LED_COLOR_RED); // Error
+        sleep_ms(500);
+        led_status_set(LED_COLOR_GREEN);
+      }
+
+      last_button_press = now;
+    }
+  }
+  button_was_pressed = button_pressed;
+#endif
 }

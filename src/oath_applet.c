@@ -2,6 +2,7 @@
 #include "error_handling.h"
 #include "hsm_layer.h"
 #include "led_status.h"
+#include "pico/stdlib.h" // For sleep_ms
 #include "storage.h"
 #include <stdio.h>
 #include <string.h>
@@ -638,4 +639,49 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
     SET_SW(OATH_SW_WRONG_P1P2);
     break;
   }
+}
+
+// Helper to calculate default OTP (first available HOTP) for Keyboard Interface
+bool oath_applet_calculate_default(char *code_out_str) {
+  storage_oath_entry_t entry;
+
+  // Search for the first valid HOTP account
+  for (int i = 0; i < STORAGE_OATH_MAX_ACCOUNTS; i++) {
+    if (storage_load_oath_account(i, &entry)) {
+      // Check if it's an HOTP account (Property 0x1?)
+      if ((entry.prop & 0xF0) == OATH_TYPE_HOTP) {
+        uint32_t code = 0;
+        printf("OATH: Found default HOTP account '%.*s' at slot %d\n",
+               entry.name_len, entry.name, i);
+
+        if (calculate_hotp(&entry, &code)) {
+          // Save updated counter
+          storage_save_oath_account(i, &entry);
+
+          // Format as 6-digit string
+          sprintf(code_out_str, "%06lu", code);
+          return true;
+        }
+      }
+    }
+  }
+
+  // If no HOTP found, try TOTP as fallback?
+  // Use TOTP if no HOTP found
+  for (int i = 0; i < STORAGE_OATH_MAX_ACCOUNTS; i++) {
+    if (storage_load_oath_account(i, &entry)) {
+      if ((entry.prop & 0xF0) == OATH_TYPE_TOTP) {
+        uint32_t code = 0;
+        printf("OATH: Found default TOTP account '%.*s' at slot %d\n",
+               entry.name_len, entry.name, i);
+
+        if (calculate_totp(&entry, NULL, &code)) {
+          sprintf(code_out_str, "%06lu", code);
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }

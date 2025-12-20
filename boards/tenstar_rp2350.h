@@ -36,6 +36,13 @@
 #define PICO_DEFAULT_WS2812_PIN 22
 #endif
 
+// --- BUTTON ---
+// Tenstar RP2350 usually has a user button on GP21 or GP23.
+// Defining as GP21 for default, user can query/change.
+#ifndef PICO_DEFAULT_USER_BUTTON_PIN
+#define PICO_DEFAULT_USER_BUTTON_PIN 21
+#endif
+
 // --- FLASH ---
 #define PICO_BOOT_STAGE2_CHOOSE_W25Q080 1
 

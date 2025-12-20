@@ -3,7 +3,6 @@
 #include "tusb.h"
 #include <stdio.h>
 
-
 // OpenToken includes
 #include "ccid_engine.h"
 #include "ctap2_engine.h"
@@ -14,7 +13,6 @@
 #include "opentoken.h"
 #include "storage.h"
 #include "yubikey_mgmt.h"
-
 
 // Helper function for tusb_init (which is a macro in modern TinyUSB)
 // to satisfy retry_operation's function pointer requirement
@@ -116,6 +114,16 @@ int main() {
   // Initialize applets
   openpgp_applet_init();
 
+  // Initialize OTP Keyboard Button
+  // Assuming defined in otp_keyboard.c/h. Need to add prototype or include
+  // header. For now, implicit declaration or we add it quickly. Ideally,
+  // include "otp_keyboard.h" but it doesn't exist yet. We'll declare it locally
+  // or add to opentoken.h
+  extern void otp_keyboard_init(void);
+  extern void otp_keyboard_task(void);
+
+  otp_keyboard_init();
+
   // Initialize TinyUSB composite device with retry
   usb_stability_update_state(USB_STATE_CONNECTING);
   if (!retry_operation((bool (*)(void))opentoken_usb_init, &RETRY_CONFIG_USB)) {
@@ -135,6 +143,9 @@ int main() {
   while (1) {
     // TinyUSB device task - handles USB enumeration and communication
     tud_task();
+
+    // OTP Keyboard Task (Button polling)
+    otp_keyboard_task();
 
     // Periodic system health monitoring
     uint32_t now = to_ms_since_boot(get_absolute_time());

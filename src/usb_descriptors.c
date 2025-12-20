@@ -125,10 +125,10 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
 // USB CONFIGURATION DESCRIPTOR
 //--------------------------------------------------------------------+
 enum {
-  ITF_NUM_HID,      // Interface 0: HID (FIDO2/CTAP2)
-  ITF_NUM_CCID,     // Interface 1: CCID (OATH/OpenPGP)
-  ITF_NUM_VENDOR,   // Interface 2: Vendor (WebUSB Management)
-  ITF_NUM_KEYBOARD, // Interface 3: HID Keyboard (OTP)
+  ITF_NUM_KEYBOARD, // Interface 0: HID Keyboard (OTP)
+  ITF_NUM_HID,      // Interface 1: HID (FIDO2/CTAP2)
+  ITF_NUM_CCID,     // Interface 2: CCID (OATH/OpenPGP)
+  ITF_NUM_VENDOR,   // Interface 3: Vendor (WebUSB Management)
   ITF_NUM_TOTAL
 };
 
@@ -140,25 +140,25 @@ uint8_t const desc_configuration[] = {
     // Configuration Descriptor
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x80, 500),
 
-    // Interface 0: HID (FIDO2/CTAP2) - with interface string descriptor
+    // Interface 0: HID Keyboard (OTP) - with interface string descriptor
+    // Use Boot Protocol (KEYBOARD) for maximum BIOS/OS compatibility
+    TUD_HID_DESCRIPTOR(ITF_NUM_KEYBOARD, 8, HID_ITF_PROTOCOL_KEYBOARD,
+                       sizeof(desc_hid_keyboard_report), EPNUM_KEYBOARD_IN,
+                       CFG_TUD_HID_EP_BUFSIZE, 10),
+
+    // Interface 1: HID (FIDO2/CTAP2) - with interface string descriptor
     TUD_HID_INOUT_DESCRIPTOR(ITF_NUM_HID, 5, HID_ITF_PROTOCOL_NONE,
                              CFG_TUD_HID_REPORT_DESC_LEN, EPNUM_HID_OUT,
                              EPNUM_HID_IN, CFG_TUD_HID_EP_BUFSIZE, 1),
 
-    // Interface 1: CCID (OATH/OpenPGP) - with interface string descriptor
+    // Interface 2: CCID (OATH/OpenPGP) - with interface string descriptor
     TUD_CCID_DESCRIPTOR(ITF_NUM_CCID, 4, EPNUM_CCID_OUT, EPNUM_CCID_IN,
                         CFG_TUD_CCID_EP_BUFSIZE),
 
-    // Interface 2: Vendor (WebUSB Management) - with interface string
+    // Interface 3: Vendor (WebUSB Management) - with interface string
     // descriptor
     TUD_VENDOR_DESCRIPTOR(ITF_NUM_VENDOR, 6, EPNUM_VENDOR_OUT, EPNUM_VENDOR_IN,
-                          64),
-
-    // Interface 3: HID Keyboard (OTP) - with interface string descriptor
-    // Use Boot Protocol (KEYBOARD) for maximum BIOS/OS compatibility
-    TUD_HID_DESCRIPTOR(ITF_NUM_KEYBOARD, 8, HID_ITF_PROTOCOL_KEYBOARD,
-                       sizeof(desc_hid_keyboard_report), EPNUM_KEYBOARD_IN,
-                       CFG_TUD_HID_EP_BUFSIZE, 10)};
+                          64)};
 
 //--------------------------------------------------------------------+
 // BOS DESCRIPTOR (Required for WebUSB)
@@ -228,9 +228,9 @@ uint8_t const desc_ms_os_20[] = {
 //--------------------------------------------------------------------+
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
   if (instance == 0) {
-    return desc_hid_report; // FIDO2
+    return desc_hid_keyboard_report; // Instance 0 is now Keyboard (First HID)
   } else if (instance == 1) {
-    return desc_hid_keyboard_report; // Keyboard
+    return desc_hid_report; // Instance 1 is now FIDO2 (Second HID)
   }
   return NULL;
 }
@@ -249,8 +249,8 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
                            hid_report_type_t report_type, uint8_t const *buffer,
                            uint16_t bufsize) {
-  // Only process CTAP2 on the FIDO2 interface (instance 0)
-  if (instance == 0) {
+  // Only process CTAP2 on the FIDO2 interface (Updated to Instance 1)
+  if (instance == 1) {
     // Process CTAP2/FIDO2 command received via USB HID
     opentoken_process_ctap2_command((uint8_t *)buffer, bufsize);
   } else {
