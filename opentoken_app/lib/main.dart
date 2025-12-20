@@ -1,13 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:opentoken_dart/opentoken_service.dart';
-import 'package:opentoken_dart/transports/transport_nfc.dart';
-import 'package:opentoken_dart/transports/transport_usb.dart';
 import 'dart:async';
 
-import 'widgets/premium_card.dart';
-import 'widgets/device_status.dart';
+import 'theme.dart';
+import 'widgets/credentials_view.dart';
+import 'widgets/add_credential_view.dart';
+import 'widgets/crypto_management_view.dart';
+import 'widgets/device_status_view.dart';
+import 'widgets/settings_view.dart';
 
 void main() {
   runApp(const OpenTokenApp());
@@ -23,12 +23,12 @@ class OpenTokenApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFFBC00FF), // Electric Purple
-        scaffoldBackgroundColor: const Color(0xFF050505),
+        primaryColor: OpenTokenTheme.electricPurple,
+        scaffoldBackgroundColor: OpenTokenTheme.deepBackground,
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFBC00FF),
-          secondary: Color(0xFF00F0FF), // Cyan
-          surface: Color(0xFF121214),
+          primary: OpenTokenTheme.electricPurple,
+          secondary: OpenTokenTheme.cyanPulse,
+          surface: OpenTokenTheme.surfaceCard,
         ),
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
@@ -47,180 +47,15 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
-  late OpenTokenSharedService _service;
-  bool _isConnected = false;
-  String _transportName = "Unknown";
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeService();
-  }
-
-  void _initializeService() {
-    // Select transport based on platform (simple logic for now)
-    final bool isMobile = Platform.isAndroid || Platform.isIOS;
-    final transport = isMobile ? NfcTransport() : UsbTransport();
-    _transportName = isMobile ? "NFC" : "USB";
-    _service = OpenTokenSharedService(transport);
-    
-    // Simulate connection for demo if needed, or real check
-    setState(() => _isConnected = true); 
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isDesktop = MediaQuery.of(context).size.width > 600;
-
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            DeviceStatusBanner(
-              isConnected: _isConnected,
-              transportName: _transportName,
-            ),
-            Expanded(
-              child: Row(
-                children: [
-                  if (isDesktop)
-                    NavigationRail(
-                      backgroundColor: const Color(0xFF0A0A0C),
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: (idx) =>
-                          setState(() => _selectedIndex = idx),
-                      labelType: NavigationRailLabelType.all,
-                      selectedLabelTextStyle: GoogleFonts.inter(
-                        color: const Color(0xFF00A3FF),
-                        fontWeight: FontWeight.bold,
-                      ),
-                      destinations: const [
-                        NavigationRailDestination(
-                            icon: Icon(Icons.security_outlined),
-                            selectedIcon: Icon(Icons.security, color: Color(0xFFBC00FF)),
-                            label: Text('OATH')),
-                        NavigationRailDestination(
-                            icon: Icon(Icons.fingerprint_outlined),
-                            selectedIcon: Icon(Icons.fingerprint, color: Color(0xFFBC00FF)),
-                            label: Text('FIDO2')),
-                        NavigationRailDestination(
-                            icon: Icon(Icons.settings_outlined),
-                            selectedIcon: Icon(Icons.settings, color: Color(0xFFBC00FF)),
-                            label: Text('Settings')),
-                      ],
-                    ),
-                  Expanded(
-                    child: _buildCurrentPage(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: isDesktop
-          ? null
-          : NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (idx) =>
-                  setState(() => _selectedIndex = idx),
-              destinations: const [
-                NavigationDestination(
-                    icon: Icon(Icons.security), label: 'OATH'),
-                NavigationDestination(
-                    icon: Icon(Icons.fingerprint), label: 'FIDO2'),
-                NavigationDestination(
-                    icon: Icon(Icons.info_outline), label: 'Device'),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildCurrentPage() {
-    switch (_selectedIndex) {
-      case 0:
-        return _OathView(service: _service);
-      case 1:
-        return _PlaceholderView(
-          title: "FIDO2",
-          subtitle: "Manage hardware security keys and discoverable credentials.",
-          icon: Icons.fingerprint,
-        );
-      case 2:
-        return _PlaceholderView(
-          title: "Settings",
-          subtitle: "Configure your OpenToken device and application preferences.",
-          icon: Icons.settings,
-        );
-      default:
-        return Container();
-    }
-  }
-}
-
-class _PlaceholderView extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _PlaceholderView({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 64, color: Colors.white10),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                color: Colors.white54,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Opacity(
-              opacity: 0.5,
-              child: Chip(
-                label: Text("COMING SOON", style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.white10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OathView extends StatefulWidget {
-  final OpenTokenSharedService service;
-  const _OathView({required this.service});
-
-  @override
-  State<_OathView> createState() => _OathViewState();
-}
-
-class _OathViewState extends State<_OathView> {
-  List<Map<String, String>> _accounts = [];
+  bool _isAddingCredential = false;
+  
+  // Mock data for OATH
+  List<Map<String, String>> _accounts = [
+    {"name": "GitHub:zequinha", "type": "TOTP"},
+    {"name": "Google:ze@work", "type": "TOTP"},
+    {"name": "AWS:prod-admin", "type": "TOTP"},
+    {"name": "ProtonMail:privacy", "type": "TOTP"},
+  ];
   Map<String, String> _codes = {};
   double _progress = 1.0;
   Timer? _timer;
@@ -228,14 +63,8 @@ class _OathViewState extends State<_OathView> {
   @override
   void initState() {
     super.initState();
-    _loadAccounts();
     _startTimer();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+    _refreshCodes();
   }
 
   void _startTimer() {
@@ -250,33 +79,8 @@ class _OathViewState extends State<_OathView> {
     });
   }
 
-  Future<void> _loadAccounts() async {
-    // In a real scenario, we'd select the applet first
-    // await widget.service.selectOathApplet();
-    // final accounts = await widget.service.listOathAccounts();
-    
-    // Mock data for WOW factor if no device is connected
-    final accounts = [
-      {"name": "GitHub:zequinha", "type": "TOTP"},
-      {"name": "Google:ze@work", "type": "TOTP"},
-      {"name": "AWS:prod-admin", "type": "TOTP"},
-    ];
-
-    setState(() {
-      _accounts = accounts;
-      // Initialize with dummy codes
-      for (var acc in accounts) {
-        _codes[acc["name"]!] = "******";
-      }
-    });
-    
-    _refreshCodes();
-  }
-
-  Future<void> _refreshCodes() async {
+  void _refreshCodes() {
     for (var acc in _accounts) {
-      // String? code = await widget.service.calculateCode(acc["name"]!);
-      // Use mock code for now to ensure UI looks great
       final mockCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
       setState(() {
         _codes[acc["name"]!] = mockCode;
@@ -285,42 +89,274 @@ class _OathViewState extends State<_OathView> {
   }
 
   @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isAddingCredential) {
+      return AddCredentialView(
+        onCancel: () => setState(() => _isAddingCredential = false),
+        onSave: (name, secret, algo, digits) {
+          setState(() {
+            _accounts.add({"name": name, "type": "TOTP"});
+            _isAddingCredential = false;
+          });
+          _refreshCodes();
+        },
+      );
+    }
+
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          "OpenToken NATIVO",
-          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            Expanded(
+              child: Row(
+                children: [
+                  if (isDesktop) _buildSidebar(),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.01),
+                        border: Border(left: BorderSide(color: Colors.white.withOpacity(0.05))),
+                      ),
+                      child: _buildCurrentPage(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildFooter(),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: () {},
+      ),
+      bottomNavigationBar: isDesktop
+          ? null
+          : NavigationBar(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
+              backgroundColor: const Color(0xFF0A0A0C),
+              indicatorColor: OpenTokenTheme.electricPurple.withOpacity(0.2),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.security), label: 'Credentials'),
+                NavigationDestination(icon: Icon(Icons.fingerprint), label: 'Crypto'),
+                NavigationDestination(icon: Icon(Icons.info_outline), label: 'Device'),
+                NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF050505),
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield, color: OpenTokenTheme.electricPurple, size: 28),
+          const SizedBox(width: 12),
+          Text(
+            "OpenToken Authenticator",
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00F0FF).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF00F0FF).withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(color: Color(0xFF00F0FF), shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Device: Connected (RP2350)",
+                  style: GoogleFonts.inter(color: const Color(0xFF00F0FF), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Icon(Icons.lock_outline, color: Colors.white38, size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 240,
+      color: const Color(0xFF050505),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          _SidebarItem(
+            icon: Icons.security_outlined,
+            label: "Credentials",
+            isSelected: _selectedIndex == 0,
+            onTap: () => setState(() => _selectedIndex = 0),
+          ),
+          _SidebarItem(
+            icon: Icons.fingerprint_outlined,
+            label: "Crypto",
+            isSelected: _selectedIndex == 1,
+            onTap: () => setState(() => _selectedIndex = 1),
+          ),
+          _SidebarItem(
+            icon: Icons.info_outline,
+            label: "Device Status",
+            isSelected: _selectedIndex == 2,
+            onTap: () => setState(() => _selectedIndex = 2),
+          ),
+          _SidebarItem(
+            icon: Icons.settings_outlined,
+            label: "Settings",
+            isSelected: _selectedIndex == 3,
+            onTap: () => setState(() => _selectedIndex = 3),
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: _accounts.length,
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
-        itemBuilder: (ctx, idx) {
-          final account = _accounts[idx];
-          final name = account["name"]!;
-          final parts = name.split(':');
-          
-          return PremiumCard(
-            title: parts.length > 1 ? parts[1] : name,
-            subtitle: parts[0],
-            code: _codes[name] ?? "000000",
-            progress: _progress,
-            onTap: () {
-              // Copy to clipboard or show details
-            },
-          );
-        },
+    );
+  }
+
+  Widget _buildCurrentPage() {
+    switch (_selectedIndex) {
+      case 0:
+        return CredentialsView(
+          accounts: _accounts,
+          codes: _codes,
+          progress: _progress,
+          onAdd: () => setState(() => _isAddingCredential = true),
+        );
+      case 1:
+        return const CryptoManagementView();
+      case 2:
+        return const DeviceStatusView();
+      case 3:
+        return const SettingsView();
+      default:
+        return Container();
+    }
+  }
+
+  Widget _buildFooter() {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF020202),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
       ),
+      child: Row(
+        children: [
+          _FooterItem(icon: Icons.usb, label: "USB: OK", color: const Color(0xFF00F0FF)),
+          const SizedBox(width: 24),
+          _FooterItem(icon: Icons.code, label: "FW: V0.3.1-BETA"),
+          const SizedBox(width: 24),
+          _FooterItem(icon: Icons.terminal, label: "PROTOCOL: V1.0"),
+          const Spacer(),
+          _FooterItem(icon: Icons.battery_charging_full, label: "BAT: 98%"),
+          const SizedBox(width: 24),
+          _FooterItem(label: "SERIAL: RP-2350-XJ92"),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? OpenTokenTheme.electricPurple : Colors.white38,
+                size: 20,
+              ),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  color: isSelected ? Colors.white : Colors.white38,
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              if (isSelected) ...[
+                const Spacer(),
+                Container(
+                  width: 4,
+                  height: 4,
+                  decoration: const BoxDecoration(color: OpenTokenTheme.electricPurple, shape: BoxShape.circle),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FooterItem extends StatelessWidget {
+  final IconData? icon;
+  final String label;
+  final Color? color;
+
+  const _FooterItem({this.icon, required this.label, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12, color: color ?? Colors.white24),
+          const SizedBox(width: 6),
+        ],
+        Text(
+          label,
+          style: GoogleFonts.jetBrainsMono(
+            color: color?.withOpacity(0.5) ?? Colors.white24,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
