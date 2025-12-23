@@ -23,20 +23,9 @@ class OpenTokenApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OpenToken NATIVO',
+      title: 'OpenToken Authenticator',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: OpenTokenTheme.electricPurple,
-        scaffoldBackgroundColor: OpenTokenTheme.deepBackground,
-        colorScheme: const ColorScheme.dark(
-          primary: OpenTokenTheme.electricPurple,
-          secondary: OpenTokenTheme.cyanPulse,
-          surface: OpenTokenTheme.surfaceCard,
-        ),
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-        useMaterial3: true,
-      ),
+      theme: OpenTokenTheme.darkTheme,
       home: const MainNavigation(),
     );
   }
@@ -52,38 +41,124 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
   bool _isAddingCredential = false;
+
+  // Global USB configuration
+  static const int usbVid = 0xCAFE;
+  static const int usbPid = 0x4004;
+
+  // Device state
+  late UsbTransport _transport;
   late OpenTokenSharedService _service;
   bool _isConnected = false;
-  String _transportName = "Unknown";
-  String _firmwareVersion = "v1.0.0-mock";
+  String _transportName = "USB";
+  String _firmwareVersion = "Unknown";
+  String _serialNumber = "Not Connected";
+  int _slotsUsed = 0;
+  int _slotsMax = 200;
 
-  // Mock data for OATH
-  List<Map<String, String>> _accounts = [
-    {"name": "GitHub:zequinha", "type": "TOTP"},
-    {"name": "Google:ze@work", "type": "TOTP"},
-    {"name": "AWS:prod-admin", "type": "TOTP"},
-    {"name": "ProtonMail:privacy", "type": "TOTP"},
-  ];
+  // Credential data (from device)
+  List<Map<String, String>> _accounts = [];
   Map<String, String> _codes = {};
   double _progress = 1.0;
   Timer? _timer;
+  Timer? _devicePollTimer;
+  bool _isPinPromptVisible = false;
+  bool _isRefreshing = false;
+  Map<dynamic, dynamic>? _fidoInfo;
 
   @override
   void initState() {
     super.initState();
-    _initializeService();
+    _initializeDevice();
     _startTimer();
-    _refreshCodes();
   }
 
-  void _initializeService() {
+  /// Initialize and connect to OpenToken device
+  Future<void> _initializeDevice() async {
     final bool isMobile = Platform.isAndroid || Platform.isIOS;
-    final transport = isMobile ? NfcTransport() : UsbTransport();
-    _transportName = isMobile ? "NFC" : "USB";
-    _service = OpenTokenSharedService(transport);
-    // In a real scenario, this would be reactive to hotplug
-    setState(() => _isConnected = true);
-    _fetchFirmwareInfo();
+
+    if (isMobile) {
+      // Mobile uses NFC - connection happens on tap
+      _transportName = "NFC";
+      final nfcTransport = NfcTransport();
+      _service = OpenTokenSharedService(nfcTransport);
+    } else {
+      // Desktop uses USB HID
+      _transportName = "USB";
+      _transport = UsbTransport(vendorId: usbVid, productId: usbPid);
+      _service = OpenTokenSharedService(_transport);
+
+      // Try to connect to device
+      await _connectToDevice();
+
+      // Start polling for device connection changes
+      _devicePollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        _checkDeviceConnection();
+      });
+    }
+  }
+
+  /// Connect to USB device
+  Future<void> _connectToDevice() async {
+    try {
+      final connected = await _transport.connect();
+      if (connected) {
+        // Select OATH applet
+        final selected = await _service.selectOathApplet();
+        if (selected) {
+          setState(() => _isConnected = true);
+          await _refreshFromDevice();
+        }
+      } else {
+        setState(() => _isConnected = false);
+      }
+    } catch (e) {
+      debugPrint('Device connection error: $e');
+      setState(() => _isConnected = false);
+    }
+  }
+
+  /// Check if device is still connected
+  Future<void> _checkDeviceConnection() async {
+    if (!_isConnected) {
+      // Try to reconnect
+      await _connectToDevice();
+    }
+  }
+
+  /// Refresh all data from device
+  Future<void> _refreshFromDevice() async {
+    await _fetchFirmwareInfo();
+    await _fetchDeviceStatus();
+    await _fetchFidoInfo();
+    await _loadAccountsFromDevice();
+  }
+
+  Future<void> _fetchFidoInfo() async {
+    if (!_isConnected) return;
+    try {
+      final info = await _service.getFidoInfo();
+      if (mounted) {
+        setState(() => _fidoInfo = info);
+      }
+    } catch (e) {
+      debugPrint('Error fetching FIDO info: $e');
+    }
+  }
+
+  /// Load accounts from device and calculate codes
+  Future<void> _loadAccountsFromDevice() async {
+    if (!_isConnected) return;
+
+    try {
+      final accounts = await _service.listOathAccounts();
+      setState(() => _accounts = accounts);
+
+      // Calculate codes for all accounts
+      await _refreshCodes();
+    } catch (e) {
+      debugPrint('Error loading accounts: $e');
+    }
   }
 
   Future<void> _fetchFirmwareInfo() async {
@@ -92,6 +167,23 @@ class _MainNavigationState extends State<MainNavigation> {
       setState(() {
         _firmwareVersion = "v$version";
       });
+    }
+  }
+
+  /// Fetch device status (slot counts)
+  Future<void> _fetchDeviceStatus() async {
+    if (!_isConnected) return;
+
+    try {
+      final status = await _service.getDeviceStatus();
+      if (status != null) {
+        setState(() {
+          _slotsUsed = status.oathCount;
+          _slotsMax = status.oathMax > 0 ? status.oathMax : 200;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching device status: $e');
     }
   }
 
@@ -116,20 +208,158 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
-  void _refreshCodes() {
-    for (var acc in _accounts) {
-      final mockCode =
-          (100000 + (DateTime.now().millisecondsSinceEpoch % 900000))
-              .toString();
-      setState(() {
+  Future<void> _refreshCodes() async {
+    if (!_isConnected) {
+      // Use mock codes when not connected
+      for (var acc in _accounts) {
+        final mockCode =
+            (100000 + (DateTime.now().millisecondsSinceEpoch % 900000))
+                .toString();
         _codes[acc["name"]!] = mockCode;
-      });
+      }
+      setState(() {});
+      return;
+    }
+
+    // Fetch real codes from device
+    for (var acc in _accounts) {
+      final name = acc["name"]!;
+      try {
+        final code = await _service.calculateCode(name);
+        if (code != null) {
+          setState(() {
+            _codes[name] = code.code;
+          });
+        }
+      } on PinRequiredException {
+        if (!_isPinPromptVisible) {
+          _showPinDialog();
+        }
+        break; // Stop trying to fetch other codes until unlocked
+      } catch (e) {
+        debugPrint('Error calculating code for $name: $e');
+      }
+    }
+  }
+
+  Future<void> _showPinDialog() async {
+    if (_isPinPromptVisible) return;
+    setState(() => _isPinPromptVisible = true);
+
+    final pinController = TextEditingController();
+    bool isLoading = false;
+    String? errorMessage;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: OpenTokenTheme.deepBackground,
+          shape: RoundedRectangleBorder(
+              borderRadius: OpenTokenTheme.borderRadiusLg,
+              side: BorderSide(color: Colors.white.withOpacity(0.1))),
+          title: Row(
+            children: [
+              const Icon(Icons.lock_outline, color: OpenTokenTheme.primary),
+              const SizedBox(width: 12),
+              Text(
+                "Device Locked",
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Your OpenToken requires a PIN to access these credentials.",
+                style: GoogleFonts.inter(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                obscureText: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Enter Device PIN",
+                  errorText: errorMessage,
+                ),
+                autofocus: true,
+                onSubmitted: (_) async {
+                  // Trigger validation
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isLoading = true;
+                        errorMessage = null;
+                      });
+
+                      try {
+                        final success =
+                            await _service.validateOathPin(pinController.text);
+                        if (success) {
+                          Navigator.pop(context);
+                          _refreshCodes();
+                        } else {
+                          setDialogState(() {
+                            errorMessage = "Incorrect PIN";
+                            isLoading = false;
+                          });
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          errorMessage = "Error validating PIN";
+                          isLoading = false;
+                        });
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("Unlock"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    setState(() => _isPinPromptVisible = false);
+  }
+
+  Future<void> _manualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      await _refreshFromDevice();
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _devicePollTimer?.cancel();
     super.dispose();
   }
 
@@ -137,13 +367,11 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     if (_isAddingCredential) {
       return AddCredentialView(
+        service: _service,
         onCancel: () => setState(() => _isAddingCredential = false),
-        onSave: (name, secret, algo, digits) {
-          setState(() {
-            _accounts.add({"name": name, "type": "TOTP"});
-            _isAddingCredential = false;
-          });
-          _refreshCodes();
+        onSuccess: () {
+          setState(() => _isAddingCredential = false);
+          _refreshFromDevice();
         },
       );
     }
@@ -184,7 +412,7 @@ class _MainNavigationState extends State<MainNavigation> {
               onDestinationSelected: (idx) =>
                   setState(() => _selectedIndex = idx),
               backgroundColor: const Color(0xFF0A0A0C),
-              indicatorColor: OpenTokenTheme.electricPurple.withOpacity(0.2),
+              indicatorColor: OpenTokenTheme.primary.withOpacity(0.2),
               destinations: const [
                 NavigationDestination(
                     icon: Icon(Icons.security), label: 'Credenciais'),
@@ -207,9 +435,16 @@ class _MainNavigationState extends State<MainNavigation> {
           codes: _codes,
           progress: _progress,
           onAdd: () => setState(() => _isAddingCredential = true),
+          isConnected: _isConnected,
+          serial: _serialNumber,
+          firmwareVersion: _firmwareVersion.replaceAll('v', ''),
+          slotsUsed: _slotsUsed,
+          slotsTotal: _slotsMax,
+          isRefreshing: _isRefreshing,
+          onRefresh: _manualRefresh,
         );
       case 1:
-        return const CryptoManagementView();
+        return CryptoManagementView(fidoInfo: _fidoInfo);
       case 2:
         return DeviceStatusView(
           firmwareVersion: _firmwareVersion,
@@ -234,8 +469,7 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.shield,
-              color: OpenTokenTheme.electricPurple, size: 28),
+          Icon(Icons.shield, color: OpenTokenTheme.primary, size: 28),
           const SizedBox(width: 12),
           Text(
             "OpenToken Authenticator",
@@ -247,13 +481,13 @@ class _MainNavigationState extends State<MainNavigation> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: _isConnected
-                  ? const Color(0xFF00F0FF).withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
+                  ? OpenTokenTheme.secondary.withOpacity(0.1)
+                  : OpenTokenTheme.error.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                   color: _isConnected
-                      ? const Color(0xFF00F0FF).withOpacity(0.2)
-                      : Colors.red.withOpacity(0.2)),
+                      ? OpenTokenTheme.secondary.withOpacity(0.2)
+                      : OpenTokenTheme.error.withOpacity(0.2)),
             ),
             child: Row(
               children: [
@@ -261,18 +495,20 @@ class _MainNavigationState extends State<MainNavigation> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                      color:
-                          _isConnected ? const Color(0xFF00F0FF) : Colors.red,
+                      color: _isConnected
+                          ? OpenTokenTheme.secondary
+                          : OpenTokenTheme.error,
                       shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _isConnected
-                      ? "Dispositivo: Conectado (RP2350)"
-                      : "Dispositivo: Desconectado",
+                      ? "Device: Connected (RP2350)"
+                      : "Device: Disconnected",
                   style: GoogleFonts.inter(
-                      color:
-                          _isConnected ? const Color(0xFF00F0FF) : Colors.red,
+                      color: _isConnected
+                          ? OpenTokenTheme.secondary
+                          : OpenTokenTheme.error,
                       fontSize: 11,
                       fontWeight: FontWeight.bold),
                 ),
@@ -333,16 +569,16 @@ class _MainNavigationState extends State<MainNavigation> {
         children: [
           _FooterItem(
               icon: Icons.usb,
-              label: "USB: ${_isConnected ? 'OK' : 'ERRO'}",
-              color: _isConnected ? const Color(0xFF00F0FF) : Colors.red),
+              label: "USB: ${_isConnected ? 'OK' : 'ERR'}",
+              color: _isConnected
+                  ? OpenTokenTheme.secondary
+                  : OpenTokenTheme.error),
           const SizedBox(width: 24),
-          _FooterItem(icon: Icons.code, label: "FW: V0.3.1-BETA"),
+          _FooterItem(icon: Icons.code, label: "FW: $_firmwareVersion"),
           const SizedBox(width: 24),
-          _FooterItem(icon: Icons.terminal, label: "PROTOCOLO: V1.0"),
+          const _FooterItem(icon: Icons.terminal, label: "PROTOCOL: V1.0"),
           const Spacer(),
-          _FooterItem(icon: Icons.battery_charging_full, label: "BAT: 98%"),
-          const SizedBox(width: 24),
-          _FooterItem(label: "SÉRIE: RP-2350-XJ92"),
+          const _FooterItem(label: "SERIAL: OT-A1B2C3D4"),
         ],
       ),
     );
@@ -374,8 +610,7 @@ class _SidebarItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color:
-                    isSelected ? OpenTokenTheme.electricPurple : Colors.white38,
+                color: isSelected ? OpenTokenTheme.primary : Colors.white38,
                 size: 20,
               ),
               const SizedBox(width: 16),
@@ -385,7 +620,8 @@ class _SidebarItem extends StatelessWidget {
                   style: GoogleFonts.inter(
                     color: isSelected ? Colors.white : Colors.white38,
                     fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -395,9 +631,8 @@ class _SidebarItem extends StatelessWidget {
                   width: 4,
                   height: 4,
                   margin: const EdgeInsets.only(left: 8),
-                  decoration: const BoxDecoration(
-                      color: OpenTokenTheme.electricPurple,
-                      shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                      color: OpenTokenTheme.primary, shape: BoxShape.circle),
                 ),
             ],
           ),

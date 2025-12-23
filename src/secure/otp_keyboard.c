@@ -137,7 +137,11 @@ void otp_keyboard_type(const char *text) {
 
 // Handler for calculating and typing OTP
 // This should be called when "Touch" is detected if configured for OTP
+#ifndef PICO_DEFAULT_USER_BUTTON_PIN
+#define BUTTON_PIN 20 // Default GPIO for OpenToken User Button
+#else
 #define BUTTON_PIN PICO_DEFAULT_USER_BUTTON_PIN
+#endif
 static uint32_t last_button_press = 0;
 static bool button_was_pressed = false;
 

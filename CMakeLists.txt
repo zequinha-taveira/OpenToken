@@ -16,24 +16,25 @@ pico_sdk_init()
 
 # Adiciona o diretório de código fonte
 add_executable(${PROJECT_NAME}
-    src/main.c
-    src/usb_descriptors.c
-    src/storage.c
-    src/cbor_utils.c
-    src/hsm_layer.c
-    src/ctap2_engine.c
-    src/ccid_engine.c
-    src/oath_applet.c
-    src/openpgp_applet.c
-    src/error_handling.c
-    src/ccid_device.c
-    src/webusb_handler.c
-    src/led_status.c
-    src/otp_keyboard.c
+    src/non_secure/main.c
+    src/secure/main_secure.c
+    src/non_secure/usb_descriptors.c
+    src/secure/storage.c
+    src/non_secure/cbor_utils.c
+    src/secure/hsm_layer.c
+    src/non_secure/ctap2_engine.c
+    src/non_secure/ccid_engine.c
+    src/non_secure/oath_applet.c
+    src/non_secure/openpgp_applet.c
+    src/non_secure/error_handling.c
+    src/non_secure/ccid_device.c
+    src/non_secure/webusb_handler.c
+    src/non_secure/led_status.c
+    src/secure/otp_keyboard.c
 )
 
 # Generate PIO header
-pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/src/non_secure/ws2812.pio)
 
 # Adiciona o diretório de includes
 target_include_directories(${PROJECT_NAME} PRIVATE 

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../theme.dart';
+
 class CryptoManagementView extends StatefulWidget {
-  const CryptoManagementView({super.key});
+  final Map<dynamic, dynamic>? fidoInfo;
+
+  const CryptoManagementView({super.key, this.fidoInfo});
 
   @override
   State<CryptoManagementView> createState() => _CryptoManagementViewState();
@@ -30,6 +34,42 @@ class _CryptoManagementViewState extends State<CryptoManagementView> {
     },
   ];
 
+  Widget _buildHardwareStatus() {
+    if (widget.fidoInfo == null) return const SizedBox.shrink();
+
+    // FIDO2 getInfo tags: 0x01 = versions, 0x06 = pinProtocols
+    final versions = widget.fidoInfo![0x01] as List?;
+    final hasFido2 = versions?.contains("FIDO_2_0") ?? false;
+    final pinProtos = widget.fidoInfo![0x06] as List?;
+    final pinV = pinProtos?.isNotEmpty == true ? pinProtos!.first : '?';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: OpenTokenTheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: OpenTokenTheme.primary.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.verified_user,
+              color: OpenTokenTheme.primary, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            "Hardware Secured: ${hasFido2 ? 'FIDO2' : 'CTAP1'} | PIN V$pinV",
+            style: GoogleFonts.inter(
+              color: OpenTokenTheme.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -54,6 +94,7 @@ class _CryptoManagementViewState extends State<CryptoManagementView> {
                   "Manage asymmetric keys stored on your hardware device. Sign challenges and generate new identities securely offline.",
                   style: GoogleFonts.inter(color: Colors.white54, fontSize: 14),
                 ),
+                _buildHardwareStatus(),
                 const SizedBox(height: 48),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

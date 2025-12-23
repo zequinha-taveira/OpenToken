@@ -1,4 +1,5 @@
 library opentoken_dart;
 
 export 'opentoken_service.dart';
-// Future exports for FIDO2, etc. will go here
+export 'transports/transport_nfc.dart';
+export 'transports/transport_usb.dart';

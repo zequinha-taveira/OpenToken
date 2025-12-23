@@ -7,10 +7,38 @@
       "name": "opentoken_dart",
       "version": "1.0.0",
       "dependencies": [
+        "cbor",
         "crypto",
-        "meta"
+        "ffi",
+        "meta",
+        "win32"
       ],
       "devDependencies": []
+    },
+    {
+      "name": "cbor",
+      "version": "6.3.7",
+      "dependencies": [
+        "characters",
+        "collection",
+        "convert",
+        "hex",
+        "ieee754",
+        "meta",
+        "typed_data"
+      ]
+    },
+    {
+      "name": "win32",
+      "version": "5.15.0",
+      "dependencies": [
+        "ffi"
+      ]
+    },
+    {
+      "name": "ffi",
+      "version": "2.1.4",
+      "dependencies": []
     },
     {
       "name": "crypto",
@@ -20,16 +48,40 @@
       ]
     },
     {
+      "name": "meta",
+      "version": "1.17.0",
+      "dependencies": []
+    },
+    {
+      "name": "characters",
+      "version": "1.4.1",
+      "dependencies": []
+    },
+    {
+      "name": "ieee754",
+      "version": "1.0.3",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "convert",
+      "version": "3.1.2",
+      "dependencies": [
+        "typed_data"
+      ]
+    },
+    {
+      "name": "hex",
+      "version": "0.2.0",
+      "dependencies": []
+    },
+    {
       "name": "typed_data",
       "version": "1.4.0",
       "dependencies": [
         "collection"
       ]
-    },
-    {
-      "name": "meta",
-      "version": "1.17.0",
-      "dependencies": []
     },
     {
       "name": "collection",

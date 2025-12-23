@@ -20,6 +20,8 @@ O OpenToken foi projetado com uma filosofia de *Security by Design*, dividindo o
 
 *   **Secure Storage**: Armazenamento em Flash isolado para segredos e credenciais.
 *   **HSM Layer**: Uma camada de abstração criptográfica que interage diretamente com o hardware para operações de chave privada.
+*   **TrustZone Separation**: Separação física de recursos (Flash, RAM, Periféricos) entre Mundo Seguro e Mundo Não-Seguro.
+*   **Factory Backend**: Assinatura offline de firmware (Sovereign Supply Chain) garantindo que apenas código autorizado seja executado.
 *   **Protocol Engines**: Motores de estado independentes para lidar com diferentes fluxos de autenticação sem vazamento de contexto.
 
 ## 🚀 Funcionalidades Principais
@@ -61,16 +63,26 @@ O OpenToken é projetado para seguir padrões abertos da indústria (FIDO2, CCID
 - [CMake](https://cmake.org/download/) (v3.13+)
 - [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk)
 
-### Build Rápido
+### Build
 ```bash
-# Clone e configure
+# 1. Clone o repositório
 git clone https://github.com/zequinha-taveira/OpenToken.git
 cd OpenToken
 
-# Configure o build (MinGW/Ninja)
-cmake -B build -G "MinGW Makefiles" -DPICO_SDK_FETCH_FROM_GIT=ON
+# 2. Configuração do SDK (Manual - Recomendado para Windows)
+# Clone o SDK e inicialize os submódulos vitais (TinyUSB, mbedTLS)
+git clone -b master https://github.com/raspberrypi/pico-sdk.git sdk
+cd sdk
+git submodule update --init lib/tinyusb lib/mbedtls
+cd ..
 
-# Compile o firmware
+# 3. Compile o firmware
+# Nota: Ajuste os caminhos do GCC conforme sua instalação (ex: Chocolatey)
+cmake -B build -G "MinGW Makefiles" -DPICO_SDK_PATH="./sdk" \
+  -DCMAKE_C_COMPILER="arm-none-eabi-gcc" \
+  -DCMAKE_CXX_COMPILER="arm-none-eabi-g++" \
+  -DCMAKE_ASM_COMPILER="arm-none-eabi-gcc"
+
 cmake --build build
 ```
 

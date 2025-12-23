@@ -92,35 +92,22 @@ int main() {
   printf("USB Composite Device: HID (FIDO2/CTAP2) + CCID (OATH/OpenPGP)\n");
   printf("VID:PID = %04X:%04X\n", OPENTOKEN_VID, OPENTOKEN_PID);
 
-  // Initialize storage and HSM layer with error handling
-  if (!retry_operation((bool (*)(void))storage_init, &RETRY_CONFIG_STORAGE)) {
-    ERROR_REPORT_CRITICAL(ERROR_STORAGE_WRITE_FAILED,
-                          "Storage initialization failed");
-    system_enter_safe_mode();
-  }
+  // Initialize Secure World (Authority)
+  extern void secure_world_init(void);
+  secure_world_init();
 
-  if (!retry_operation((bool (*)(void))hsm_init, &RETRY_CONFIG_CRYPTO)) {
-    ERROR_REPORT_CRITICAL(ERROR_CRYPTO_KEY_GENERATION,
-                          "HSM initialization failed");
-    system_enter_safe_mode();
-  }
-
-  // Initialize protocol engines
+  // Initialize protocol engines (Non-Secure)
   ctap2_engine_init();
   ccid_engine_init();
 
   // Initialize applets
   openpgp_applet_init();
 
-  // Initialize OTP Keyboard Button
-  // Assuming defined in otp_keyboard.c/h. Need to add prototype or include
-  // header. For now, implicit declaration or we add it quickly. Ideally,
-  // include "otp_keyboard.h" but it doesn't exist yet. We'll declare it locally
-  // or add to opentoken.h
-  extern void otp_keyboard_init(void);
+  // OTP Keyboard Task is still needed here for polling? 
+  // If otp_keyboard is strictly secure, polling should happen in secure world or via IPC.
+  // For now, we assume otp_keyboard_task needs to be called.
+  // If we moved otp_keyboard.c to secure, we should expose the task function or manage it there.
   extern void otp_keyboard_task(void);
-
-  otp_keyboard_init();
 
   // Initialize TinyUSB composite device with retry
   usb_stability_update_state(USB_STATE_CONNECTING);
