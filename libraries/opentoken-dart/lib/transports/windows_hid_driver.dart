@@ -41,3 +41,16 @@ final _hidD_GetHidGuid =
         'HidD_GetHidGuid');
 
 void HidD_GetHidGuid(Pointer<GUID> guid) => _hidD_GetHidGuid(guid);
+
+typedef HidD_GetSerialNumberString_Native = Int32 Function(
+    IntPtr HidDeviceObject, Pointer<Void> Buffer, Uint32 BufferLength);
+typedef HidD_GetSerialNumberString_Dart = int Function(
+    int HidDeviceObject, Pointer<Void> Buffer, int BufferLength);
+final _hidD_GetSerialNumberString = _hidDll.lookupFunction<
+    HidD_GetSerialNumberString_Native,
+    HidD_GetSerialNumberString_Dart>('HidD_GetSerialNumberString');
+
+bool HidD_GetSerialNumberString(
+    int deviceHandle, Pointer<Void> buffer, int bufferLength) {
+  return _hidD_GetSerialNumberString(deviceHandle, buffer, bufferLength) != 0;
+}

@@ -95,7 +95,10 @@ class UsbTransport implements OpenTokenTransport {
         final detailData = calloc<Uint8>(requiredSize.value);
         final detailDataPtr =
             detailData.cast<SP_DEVICE_INTERFACE_DETAIL_DATA_>();
-        detailDataPtr.ref.cbSize = sizeOf<SP_DEVICE_INTERFACE_DETAIL_DATA_>();
+        // On x64 Windows, cbSize is 8 bytes.
+        // On x32 Windows, it would be 4 + sizeof(WCHAR).
+        // SetupDiGetDeviceInterfaceDetail requires this to be set correctly.
+        detailDataPtr.ref.cbSize = (sizeOf<IntPtr>() == 8) ? 8 : 6;
 
         if (SetupDiGetDeviceInterfaceDetail(
               deviceInfoSet,
@@ -108,13 +111,16 @@ class UsbTransport implements OpenTokenTransport {
             TRUE) {
           // Extract device path
           final pathPtr = Pointer<Utf16>.fromAddress(
-            detailDataPtr.address + sizeOf<DWORD>(),
+            detailDataPtr.address + 4, // OFFSET is always 4 bytes after cbSize
           );
           final devicePath = pathPtr.toDartString();
 
-          // Check if this is an OpenToken device
-          if (await _isOpenTokenDevice(devicePath)) {
-            devices.add(devicePath);
+          // Specifically look for Interface 1 (&mi_01) - This is the FIDO2/CTAP interface
+          // Interface 0 is the Keyboard, which doesn't support our custom tunnel.
+          if (devicePath.toLowerCase().contains('&mi_01')) {
+            if (await _isOpenTokenDevice(devicePath)) {
+              devices.add(devicePath);
+            }
           }
         }
 
@@ -136,7 +142,7 @@ class UsbTransport implements OpenTokenTransport {
     final pathPtr = devicePath.toNativeUtf16();
     final handle = CreateFile(
       pathPtr,
-      GENERIC_READ,
+      0, // ACCESS: 0 (NULL access) allows getting attributes without locking the device
       FILE_SHARE_READ | FILE_SHARE_WRITE,
       nullptr,
       OPEN_EXISTING,
@@ -223,6 +229,32 @@ class UsbTransport implements OpenTokenTransport {
     _isConnected = false;
     _devicePath = null;
     _connectionController.add(false);
+  }
+
+  /// Get device serial number string
+  Future<String?> getSerialNumber() async {
+    if (!_isConnected ||
+        _deviceHandle == 0 ||
+        _deviceHandle == INVALID_HANDLE_VALUE) {
+      return null;
+    }
+
+    // Typical serial numbers are Short (12-32 chars)
+    final bufferSize = 256;
+    final buffer = calloc<Uint8>(bufferSize);
+
+    try {
+      if (HidD_GetSerialNumberString(
+          _deviceHandle, buffer.cast<Void>(), bufferSize)) {
+        return buffer.cast<Utf16>().toDartString();
+      }
+    } catch (e) {
+      print('Error getting serial number: $e');
+    } finally {
+      calloc.free(buffer);
+    }
+
+    return null;
   }
 
   /// Send APDU via CCID encapsulation

@@ -50,7 +50,7 @@ class _MainNavigationState extends State<MainNavigation> {
   bool _isConnected = false;
   String _transportName = "USB";
   String _firmwareVersion = "Unknown";
-  final String _serialNumber = "Not Connected";
+  String _serialNumber = "Not Connected";
   int _slotsUsed = 0;
   int _slotsMax = 200;
 
@@ -95,11 +95,19 @@ class _MainNavigationState extends State<MainNavigation> {
         // Select OATH applet
         final selected = await _service.selectOathApplet();
         if (selected) {
-          setState(() => _isConnected = true);
+          // Get serial number
+          final serial = await _transport.getSerialNumber();
+          setState(() {
+            _isConnected = true;
+            if (serial != null) _serialNumber = serial;
+          });
           await _refreshFromDevice();
         }
       } else {
-        setState(() => _isConnected = false);
+        setState(() {
+          _isConnected = false;
+          _serialNumber = "Not Connected";
+        });
       }
     } catch (e) {
       debugPrint('Device connection error: $e');
