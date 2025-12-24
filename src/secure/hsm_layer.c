@@ -210,42 +210,9 @@ bool hsm_verify_pin(const uint8_t *pin_in, uint16_t pin_len) {
 
 bool hsm_calculate_oath(const uint8_t *challenge_in, uint16_t challenge_len,
                         uint8_t *code_out, uint16_t *code_len) {
-  printf("HSM: OATH Calc (mbedTLS HMAC-SHA1).\n");
-  // HARDCODED SECRET for Demo: "abba" (0x61 0x62 0x62 0x61)
-  // Matches the default manual entry in walkthrough.
-  uint8_t secret[] = "abba";
-
-  uint8_t hmac_result[20]; // SHA1 is 20 bytes
-
-  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
-
-  if (mbedtls_md_hmac(md_info, secret, 4, challenge_in, challenge_len,
-                      hmac_result) != 0) {
-    return false;
-  }
-
-  // Truncate
-  uint8_t offset = hmac_result[19] & 0x0F;
-  uint32_t bin_code = (hmac_result[offset] & 0x7F) << 24 |
-                      (hmac_result[offset + 1] & 0xFF) << 16 |
-                      (hmac_result[offset + 2] & 0xFF) << 8 |
-                      (hmac_result[offset + 3] & 0xFF);
-
-  // Convert to 6 digits? Usually OATH returns the full code (uint32) and app
-  // truncates. Spec says: "The R response Data field contains the 4 bytes ...
-  // of the truncated value" So we return the big-endian 4-byte integer.
-
-  // However, Yk codes are usually standard TOTP arithmetic.
-  // The previous stub was returning raw bytes.
-  // Let's pass the 4-byte truncated value.
-
-  code_out[0] = (bin_code >> 24) & 0xFF;
-  code_out[1] = (bin_code >> 16) & 0xFF;
-  code_out[2] = (bin_code >> 8) & 0xFF;
-  code_out[3] = bin_code & 0xFF;
-  *code_len = 4;
-
-  return true;
+  printf(
+      "HSM: OATH calculation must be performed by OATH applet with context.\n");
+  return false;
 }
 
 // Generate ECC P-256 keypair and store in secure slot

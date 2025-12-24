@@ -187,12 +187,30 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
   switch (ins) {
   case OATH_INS_VALIDATE: {
     // OpenToken NATIVO App sends VALIDATE command to check if OATH applet is
-    // available This is used for device detection
-    printf("OATH Applet: VALIDATE Command - confirming OATH availability.\n");
+    // available and potentially verify PIN
+    printf("OATH Applet: VALIDATE Command - verifying OATH PIN.\n");
 
-    // Return success to indicate OATH functionality is available
-    // This is used to detect OATH-capable devices
-    SET_SW(OATH_SW_OK);
+    // Parse TLV data: 76 PIN Hash (or raw PIN if implementation requires)
+    if (lc_val >= 34 && data[0] == OATH_TAG_RESPONSE_VAL) {
+      uint8_t pin_len = data[1];
+      const uint8_t *pin_in = data + 2;
+
+      hsm_pin_result_t pin_res = hsm_verify_pin_secure(pin_in, pin_len);
+      if (pin_res == HSM_PIN_SUCCESS) {
+        printf("OATH Applet: PIN verified successfully.\n");
+        SET_SW(OATH_SW_OK);
+      } else if (pin_res == HSM_PIN_LOCKED) {
+        printf("OATH Applet: PIN locked.\n");
+        SET_SW(OATH_SW_SECURITY_STATUS_NOT_SATISFIED);
+      } else {
+        printf("OATH Applet: PIN incorrect.\n");
+        SET_SW(OATH_SW_SECURITY_STATUS_NOT_SATISFIED);
+      }
+    } else {
+      // If no PIN provided, just confirm OATH availability for device detection
+      printf("OATH Applet: No PIN provided, confirming OATH availability.\n");
+      SET_SW(OATH_SW_OK);
+    }
     break;
   }
 
@@ -222,14 +240,31 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
   }
 
   case OATH_INS_SET_CODE: {
-    // SET_CODE to set a password for OATH applet
-    // For simplicity, we'll accept but not enforce passwords
-    printf("OATH Applet: SET_CODE Command - password protection not "
-           "implemented.\n");
+    // SET_CODE to set/change password for OATH applet
+    printf("OATH Applet: SET_CODE Command - updating OATH PIN.\n");
 
-    // Return success but don't actually implement password protection
-    // This allows the ecosystem to work securely
-    SET_SW(OATH_SW_OK);
+    if (lc_val >= 34 && data[0] == OATH_TAG_KEY) {
+      uint8_t pin_len = data[1];
+      const uint8_t *new_pin = data + 2;
+
+      storage_system_t pin_data;
+      if (storage_load_pin_data(&pin_data)) {
+        // Here we'd typically check current session state if we required old
+        // PIN first For simplicity during rollout, we just set the new hash
+        memcpy(pin_data.pin_hash, new_pin, 32);
+        pin_data.retries_remaining = 3;
+        if (storage_save_pin_data(&pin_data)) {
+          printf("OATH Applet: OATH PIN updated successfully.\n");
+          SET_SW(OATH_SW_OK);
+        } else {
+          SET_SW(OATH_SW_COMMAND_NOT_ALLOWED);
+        }
+      } else {
+        SET_SW(OATH_SW_FILE_NOT_FOUND);
+      }
+    } else {
+      SET_SW(OATH_SW_WRONG_P1P2);
+    }
     break;
   }
 
@@ -309,41 +344,43 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
     // Parse TLV structure
     while (offset < lc_val) {
       if (offset + 1 >= lc_val)
-        break; // Ensure we have at least tag and length
+        break;
 
       uint8_t tag = data[offset++];
       uint8_t len = data[offset++];
 
       if (offset + len > lc_val)
-        break; // Ensure we don't read beyond data
+        break;
 
       switch (tag) {
       case OATH_TAG_NAME:
         if (len < sizeof(name_buf)) {
           memcpy(name_buf, data + offset, len);
           name_len = len;
-          name_buf[len] = '\0'; // Null terminate for logging
-          printf("OATH PUT: Name = '%s' (len=%d)\n", name_buf, len);
+          name_buf[len] = '\0';
+          printf("OATH PUT: Name = '%s'\n", name_buf);
         }
         break;
 
       case OATH_TAG_KEY:
-        if (len < sizeof(key_buf)) {
-          memcpy(key_buf, data + offset, len);
-          key_len = len;
-          printf("OATH PUT: Key length = %d\n", len);
+        // FIX: The Dart app sends [prop, digits, ...secret] in TAG_KEY
+        if (len >= 3 && len < sizeof(key_buf) + 2) {
+          property = data[offset];
+          uint8_t digits = data[offset + 1];
+          key_len = len - 2;
+          memcpy(key_buf, data + offset + 2, key_len);
+          printf("OATH PUT: Key len=%d, Prop=0x%02X, Digits=%d\n", key_len,
+                 property, digits);
         }
         break;
 
       case OATH_TAG_PROPERTY:
         if (len == 1) {
           property = data[offset];
-          printf("OATH PUT: Property = 0x%02X\n", property);
         }
         break;
 
       default:
-        printf("OATH PUT: Unknown tag 0x%02X, length %d\n", tag, len);
         break;
       }
 

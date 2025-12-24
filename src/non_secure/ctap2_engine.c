@@ -840,7 +840,9 @@ void opentoken_process_ctap2_command(uint8_t *buffer, uint16_t len) {
 
     opentoken_process_ccid_apdu(buffer + 7, payload_len, apdu_response,
                                 &apdu_resp_len);
-    ctap_send_response(cid, cmd & 0x7F, apdu_response, apdu_resp_len);
+    // FIX: Preserve the 0x80 flag in the response command to maintain
+    // consistency
+    ctap_send_response(cid, cmd, apdu_response, apdu_resp_len);
     g_ctap2_ctx.state = CTAP2_STATE_IDLE;
   } else if (cmd == (CTAPHID_CMD_PING | CTAPHID_INIT_FLAG)) {
     // CTAPHID_PING command - echo payload

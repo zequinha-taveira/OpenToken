@@ -157,19 +157,12 @@ class OpenTokenSharedService {
   Future<OathCode?> calculateCode(String accountName, {int? digits}) async {
     final nameBytes = utf8.encode(accountName);
 
-    // Build challenge (current time / 30 for TOTP)
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    // Build challenge (current UTC time / 30 for TOTP)
+    final timestamp = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
     final challenge = (timestamp ~/ 30);
-    final challengeBytes = [
-      (challenge >> 56) & 0xFF,
-      (challenge >> 48) & 0xFF,
-      (challenge >> 40) & 0xFF,
-      (challenge >> 32) & 0xFF,
-      (challenge >> 24) & 0xFF,
-      (challenge >> 16) & 0xFF,
-      (challenge >> 8) & 0xFF,
-      challenge & 0xFF,
-    ];
+    final challengeBytes = Uint8List(8);
+    final challengeData = ByteData.view(challengeBytes.buffer);
+    challengeData.setUint64(0, challenge, Endian.big);
 
     final data = <int>[
       TAG_NAME,
