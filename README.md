@@ -49,10 +49,11 @@ Integrated a WS2812 RGB LED driver (GP22) to provide visual feedback for common 
 | Color | State | Trigger |
 | :--- | :--- | :--- |
 | 🟢 **Green** | **Idle** | Device initialized and connected |
-| 🔵 **Blue** | **FIDO2** | User Presence (Touch) Request |
+| 🔵 **Blue** | **FIDO2** | User Presence (Touch) Request / Activity |
 | 🟡 **Yellow**| **OATH** | TOTP/HOTP Calculation Activity |
+| 🟣 **Purple**| **OpenPGP**| Cryptographic Signing / Key Generation |
 | 🔴 **Red** | **Error** | Critical Fault / Safe Mode |
-| 🟣 **White** | **Boot** | Power On / Initialization |
+| ⚪ **White** | **Boot** | Power On / Initialization |
 
 ## 🔌 Compatibilidade
 
