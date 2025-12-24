@@ -537,6 +537,11 @@ uint8_t ctap2_handle_make_credential(const uint8_t *cbor_data,
   cbor_encoder_t enc;
   cbor_encoder_init(&enc, response, 1024);
 
+  // Pulse Blue for success/activity
+  led_status_set(LED_COLOR_BLUE);
+  sleep_ms(10);
+  led_status_set(LED_COLOR_GREEN);
+
   // Status: OK
   if (!cbor_encode_uint(&enc, CTAP2_OK))
     return CTAP2_ERR_PROCESSING;
@@ -711,6 +716,11 @@ uint8_t ctap2_handle_get_assertion(const uint8_t *cbor_data, uint16_t cbor_len,
   // Build response
   cbor_encoder_t enc;
   cbor_encoder_init(&enc, response, 1024);
+
+  // Pulse Blue for success/activity
+  led_status_set(LED_COLOR_BLUE);
+  sleep_ms(10);
+  led_status_set(LED_COLOR_GREEN);
 
   // Status: OK
   if (!cbor_encode_uint(&enc, CTAP2_OK))

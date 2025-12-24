@@ -1,5 +1,6 @@
 #include "openpgp_applet.h"
 #include "hsm_layer.h"
+#include "led_status.h"
 #include "storage.h"
 #include <stdio.h>
 #include <string.h>
@@ -139,6 +140,9 @@ static bool generate_key_pair(uint8_t key_ref, uint8_t *response,
     break;
   }
 
+  // Visual feedback for key generation
+  led_status_set(LED_COLOR_PURPLE);
+
   // Format public key response (simplified format)
   // In real OpenPGP card, this would be a proper DER/TLV encoded public key
   response[0] = 0x7F; // Public key template tag
@@ -149,6 +153,9 @@ static bool generate_key_pair(uint8_t key_ref, uint8_t *response,
   memcpy(response + 5, pubkey.x, 32);
   memcpy(response + 37, pubkey.y, 32);
   *response_len = 69;
+
+  sleep_ms(10);                    // Make LED visible
+  led_status_set(LED_COLOR_GREEN); // Revert to idle
 
   printf("OpenPGP Applet: Key pair generated for reference 0x%02X\n", key_ref);
   return true;
@@ -169,9 +176,16 @@ static bool perform_signature(const uint8_t *hash_data, uint8_t hash_len,
     return false;
   }
 
+  // Visual feedback for signature
+  led_status_set(LED_COLOR_PURPLE);
+
   // Use HSM to sign with the signing key
-  return hsm_sign_ecc_slot(HSM_KEY_SLOT_OPENPGP_SIGN, hash_data, hash_len,
-                           response, response_len);
+  bool ret = hsm_sign_ecc_slot(HSM_KEY_SLOT_OPENPGP_SIGN, hash_data, hash_len,
+                               response, response_len);
+
+  sleep_ms(10);                    // Make LED visible
+  led_status_set(LED_COLOR_GREEN); // Revert to idle
+  return ret;
 }
 
 //--------------------------------------------------------------------+
