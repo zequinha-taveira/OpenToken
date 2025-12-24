@@ -436,18 +436,21 @@ class _ActionButton extends StatelessWidget {
         borderRadius: OpenTokenTheme.borderRadiusMd,
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      child: IconButton(
-        icon: isLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white70,
-                ),
-              )
-            : Icon(icon, color: Colors.white70, size: 20),
-        onPressed: onPressed,
+      child: Material(
+        color: Colors.transparent,
+        child: IconButton(
+          icon: isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white70,
+                  ),
+                )
+              : Icon(icon, color: Colors.white70, size: 20),
+          onPressed: onPressed,
+        ),
       ),
     );
   }

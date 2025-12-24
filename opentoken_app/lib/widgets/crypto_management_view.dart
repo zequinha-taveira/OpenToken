@@ -72,106 +72,113 @@ class _CryptoManagementViewState extends State<CryptoManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 6,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Crypto Management",
-                  style: GoogleFonts.inter(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Manage asymmetric keys stored on your hardware device. Sign challenges and generate new identities securely offline.",
-                  style: GoogleFonts.inter(color: Colors.white54, fontSize: 14),
-                ),
-                _buildHardwareStatus(),
-                const SizedBox(height: 48),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("Stored Keys (3/16 slots used)",
-                        style: GoogleFonts.inter(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
-                    IconButton(
-                        icon: const Icon(Icons.refresh,
-                            color: Colors.white38, size: 20),
-                        onPressed: () {}),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildKeyTable(),
-                const SizedBox(height: 24),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text("Generate New Key"),
-                    style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF007BFF)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 48),
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildToolCard("Sign Challenge", [
-                  _buildLabel("INPUT DATA"),
-                  _buildInputArea("0x..."),
-                  const SizedBox(height: 24),
-                  _buildLabel("SIGNING KEY"),
-                  _buildDropdown("Slot #01 (ECDSA P-256)"),
-                  const SizedBox(height: 32),
-                  _buildPrimaryButton("Sign with Device", Icons.fingerprint),
-                  const SizedBox(height: 24),
-                  _buildLabel("SIGNATURE OUTPUT"),
-                  _buildInputArea("Waiting for signature...", readOnly: true),
-                ]),
-                const SizedBox(height: 32),
-                _buildToolCard("Quick Actions", [
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(40.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 6,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    "Generate a new key pair on the next available slot (#04).",
-                    style:
-                        GoogleFonts.inter(color: Colors.white54, fontSize: 13),
+                    "Crypto Management",
+                    style: GoogleFonts.inter(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Manage asymmetric keys stored on your hardware device. Sign challenges and generate new identities securely offline.",
+                    style:
+                        GoogleFonts.inter(color: Colors.white54, fontSize: 14),
+                  ),
+                  _buildHardwareStatus(),
+                  const SizedBox(height: 48),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: _buildDropdown("ECDSA P-256")),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.05),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                        ),
-                        child: const Text("Generate"),
+                      Text("Stored Keys (3/16 slots used)",
+                          style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
+                      Material(
+                        color: Colors.transparent,
+                        child: IconButton(
+                            icon: const Icon(Icons.refresh,
+                                color: Colors.white38, size: 20),
+                            onPressed: () {}),
                       ),
                     ],
                   ),
-                ]),
-              ],
+                  const SizedBox(height: 16),
+                  _buildKeyTable(),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text("Generate New Key"),
+                      style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF007BFF)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 48),
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildToolCard("Sign Challenge", [
+                    _buildLabel("INPUT DATA"),
+                    _buildInputArea("0x..."),
+                    const SizedBox(height: 24),
+                    _buildLabel("SIGNING KEY"),
+                    _buildDropdown("Slot #01 (ECDSA P-256)"),
+                    const SizedBox(height: 32),
+                    _buildPrimaryButton("Sign with Device", Icons.fingerprint),
+                    const SizedBox(height: 24),
+                    _buildLabel("SIGNATURE OUTPUT"),
+                    _buildInputArea("Waiting for signature...", readOnly: true),
+                  ]),
+                  const SizedBox(height: 32),
+                  _buildToolCard("Quick Actions", [
+                    Text(
+                      "Generate a new key pair on the next available slot (#04).",
+                      style: GoogleFonts.inter(
+                          color: Colors.white54, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(child: _buildDropdown("ECDSA P-256")),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.05),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                          child: const Text("Generate"),
+                        ),
+                      ],
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -228,10 +235,13 @@ class _CryptoManagementViewState extends State<CryptoManagementView> {
         _buildTableCell(key["date"], Colors.white38),
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  color: Colors.white24, size: 18),
-              onPressed: () {}),
+          child: Material(
+            color: Colors.transparent,
+            child: IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    color: Colors.white24, size: 18),
+                onPressed: () {}),
+          ),
         ),
       ],
     );

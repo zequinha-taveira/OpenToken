@@ -15,54 +15,77 @@ class DeviceStatusView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Status do Dispositivo",
-                    style: GoogleFonts.inter(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Alvo: Elemento Seguro OpenToken RP2350",
-                    style:
-                        GoogleFonts.inter(color: Colors.white54, fontSize: 14),
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text("Verificar Atualizações"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF007BFF),
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(40.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          "Status do Dispositivo",
+                          style: GoogleFonts.inter(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                        const SizedBox(width: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00F0FF).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF00F0FF).withOpacity(0.3)),
+                          ),
+                          child: Text("RP2350 NATIVE",
+                              style: GoogleFonts.jetBrainsMono(
+                                  color: const Color(0xFF00F0FF),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Alvo: Elemento Seguro OpenToken RP2350",
+                      style: GoogleFonts.inter(
+                          color: Colors.white54, fontSize: 14),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 48),
-          _buildHardwareCard(),
-          const SizedBox(height: 32),
-          _buildStorageBar(),
-          const SizedBox(height: 48),
-          _buildDangerZone(),
-        ],
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text("Verificar Atualizações"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF007BFF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 48),
+            _buildHardwareCard(),
+            const SizedBox(height: 32),
+            _buildStorageBar(),
+            const SizedBox(height: 48),
+            _buildDangerZone(),
+          ],
+        ),
       ),
     );
   }

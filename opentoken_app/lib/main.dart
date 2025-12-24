@@ -377,14 +377,17 @@ class _MainNavigationState extends State<MainNavigation> {
                 children: [
                   if (isDesktop) _buildSidebar(),
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.01),
-                        border: Border(
-                            left: BorderSide(
-                                color: Colors.white.withOpacity(0.05))),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.01),
+                          border: Border(
+                              left: BorderSide(
+                                  color: Colors.white.withOpacity(0.05))),
+                        ),
+                        child: _buildCurrentPage(),
                       ),
-                      child: _buildCurrentPage(),
                     ),
                   ),
                 ],
@@ -564,6 +567,8 @@ class _MainNavigationState extends State<MainNavigation> {
                   : OpenTokenTheme.error),
           const SizedBox(width: 24),
           _FooterItem(icon: Icons.code, label: "FW: $_firmwareVersion"),
+          const SizedBox(width: 24),
+          const _FooterItem(icon: Icons.hardware, label: "CHIP: RP2350"),
           const SizedBox(width: 24),
           const _FooterItem(icon: Icons.terminal, label: "PROTOCOL: V1.0"),
           const Spacer(),

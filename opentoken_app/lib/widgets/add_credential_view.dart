@@ -40,9 +40,9 @@ class _AddCredentialViewState extends State<AddCredentialView> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: OpenTokenTheme.deepBackground,
-      child:
+    return Scaffold(
+      backgroundColor: OpenTokenTheme.deepBackground,
+      body:
           _showManualEntry ? _buildManualEntryForm() : _buildMethodSelection(),
     );
   }
@@ -234,35 +234,38 @@ class _AddCredentialViewState extends State<AddCredentialView> {
   }
 
   Widget _buildQuickSetupButton(String name, String emoji) {
-    return InkWell(
-      onTap: () {
-        _nameController.text = name;
-        setState(() => _showManualEntry = true);
-      },
-      borderRadius: OpenTokenTheme.borderRadiusMd,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: OpenTokenTheme.space4,
-          vertical: OpenTokenTheme.space3,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: OpenTokenTheme.borderRadiusMd,
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 18)),
-            const SizedBox(width: OpenTokenTheme.space2),
-            Text(
-              name,
-              style: GoogleFonts.inter(
-                color: Colors.white70,
-                fontSize: OpenTokenTheme.textSm,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _nameController.text = name;
+          setState(() => _showManualEntry = true);
+        },
+        borderRadius: OpenTokenTheme.borderRadiusMd,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: OpenTokenTheme.space4,
+            vertical: OpenTokenTheme.space3,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: OpenTokenTheme.borderRadiusMd,
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: OpenTokenTheme.space2),
+              Text(
+                name,
+                style: GoogleFonts.inter(
+                  color: Colors.white70,
+                  fontSize: OpenTokenTheme.textSm,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
