@@ -1,5 +1,6 @@
 #include "ctap2_engine.h"
 #include "cbor_utils.h"
+#include "ccid_engine.h"
 #include "error_handling.h"
 #include "hsm_layer.h"
 #include "led_status.h"
@@ -9,7 +10,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
 
 // CTAPHID Commands
 #define CTAPHID_CMD_MSG 0x03
@@ -798,97 +798,120 @@ void opentoken_process_ctap2_command(uint8_t *buffer, uint16_t len) {
   if (cmd == (CTAPHID_CMD_INIT | CTAPHID_INIT_FLAG)) {
     // CTAPHID_INIT command
     if (payload_len < 8) {
-      printf("CTAP2: Invalid INIT payload length\n");
+      // ... error handling ...
       return;
     }
+    // ... existing init logic ...
+  } else if (cmd == (CTAPHID_CMD_APDU_TUNNEL | CTAPHID_INIT_FLAG)) {
+    // APDU Tunneling Command (Vendor Specific 0x70)
+    // Payload: [APDU...]
+    // Response: [APDU Response... SW1 SW2]
 
-    uint8_t resp[17];
-    memcpy(resp, buffer + 7, 8); // Echo nonce
+    uint8_t apdu_response[APDU_RESPONSE_MAX_LEN];
+    uint16_t apdu_resp_len = 0;
 
-    // Generate new CID (simple increment for demo)
-    static uint32_t next_cid = 0x12345678;
-    uint32_t new_cid = next_cid++;
+    // Process extracted APDU using CCID engine
+    // Skip first 7 bytes of CTAP header (buffer[7] is start of payload)
+    opentoken_process_ccid_apdu(buffer + 7, payload_len, apdu_response,
+                                &apdu_resp_len);
 
-    resp[8] = new_cid & 0xFF;
-    resp[9] = (new_cid >> 8) & 0xFF;
-    resp[10] = (new_cid >> 16) & 0xFF;
-    resp[11] = (new_cid >> 24) & 0xFF;
+    // Send back response via CTAPHID
+    ctap_send_response(cid, cmd & 0x7F, apdu_response, apdu_resp_len);
 
-    resp[12] = 2; // Protocol Version
-    resp[13] = 1; // Major Version
-    resp[14] = 0; // Minor Version
-    resp[15] = 0; // Build Version
-    resp[16] = 0; // Capabilities
-
-    ctap_send_response(cid, cmd, resp, 17);
     g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+    return;
+  } else if (cmd == (CTAPHID_CMD_CBOR | CTAPHID_INIT_FLAG)) {
+    printf("CTAP2: Invalid INIT payload length\n");
+    return;
+  }
 
-  } else if (cmd == (CTAPHID_CMD_PING | CTAPHID_INIT_FLAG)) {
-    // CTAPHID_PING command - echo payload
-    ctap_send_response(cid, cmd, buffer + 7, payload_len);
-    g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+  uint8_t resp[17];
+  memcpy(resp, buffer + 7, 8); // Echo nonce
 
-  } else if (cmd == (CTAPHID_CMD_MSG | CTAPHID_INIT_FLAG) ||
-             cmd == (CTAPHID_CMD_CBOR | CTAPHID_INIT_FLAG)) {
-    // CTAP2 command
-    if (len < 8) {
-      printf("CTAP2: Invalid CTAP2 command length\n");
+  // Generate new CID (simple increment for demo)
+  static uint32_t next_cid = 0x12345678;
+  uint32_t new_cid = next_cid++;
+
+  resp[8] = new_cid & 0xFF;
+  resp[9] = (new_cid >> 8) & 0xFF;
+  resp[10] = (new_cid >> 16) & 0xFF;
+  resp[11] = (new_cid >> 24) & 0xFF;
+
+  resp[12] = 2; // Protocol Version
+  resp[13] = 1; // Major Version
+  resp[14] = 0; // Minor Version
+  resp[15] = 0; // Build Version
+  resp[16] = 0; // Capabilities
+
+  ctap_send_response(cid, cmd, resp, 17);
+  g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+}
+else if (cmd == (CTAPHID_CMD_PING | CTAPHID_INIT_FLAG)) {
+  // CTAPHID_PING command - echo payload
+  ctap_send_response(cid, cmd, buffer + 7, payload_len);
+  g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+}
+else if (cmd == (CTAPHID_CMD_MSG | CTAPHID_INIT_FLAG) ||
+         cmd == (CTAPHID_CMD_CBOR | CTAPHID_INIT_FLAG)) {
+  // CTAP2 command
+  if (len < 8) {
+    printf("CTAP2: Invalid CTAP2 command length\n");
+    g_ctap2_ctx.state = CTAP2_STATE_ERROR;
+    return;
+  }
+
+  uint8_t ctap_method = buffer[7];
+  uint8_t response[1024];
+  uint16_t response_len = 0;
+  uint8_t status = CTAP2_ERR_INVALID_COMMAND;
+
+  g_ctap2_ctx.current_command = ctap_method;
+
+  switch (ctap_method) {
+  case CTAP2_GET_INFO:
+    status = ctap2_handle_get_info(response, &response_len);
+    break;
+
+  case CTAP2_MAKE_CREDENTIAL:
+    status = ctap2_handle_make_credential(buffer + 8, payload_len - 1, response,
+                                          &response_len);
+    break;
+
+  case CTAP2_GET_ASSERTION:
+    status = ctap2_handle_get_assertion(buffer + 8, payload_len - 1, response,
+                                        &response_len);
+    break;
+
+  default:
+    printf("CTAP2: Unsupported method 0x%02X\n", ctap_method);
+    status = CTAP2_ERR_INVALID_COMMAND;
+    break;
+  }
+
+  // Send response or error with proper error handling
+  if (status == CTAP2_OK && response_len > 0) {
+    if (!ctap_send_response(cid, cmd, response, response_len)) {
+      ERROR_REPORT_ERROR(ERROR_PROTOCOL_SEQUENCE_ERROR,
+                         "Failed to send CTAP2 response");
       g_ctap2_ctx.state = CTAP2_STATE_ERROR;
       return;
     }
-
-    uint8_t ctap_method = buffer[7];
-    uint8_t response[1024];
-    uint16_t response_len = 0;
-    uint8_t status = CTAP2_ERR_INVALID_COMMAND;
-
-    g_ctap2_ctx.current_command = ctap_method;
-
-    switch (ctap_method) {
-    case CTAP2_GET_INFO:
-      status = ctap2_handle_get_info(response, &response_len);
-      break;
-
-    case CTAP2_MAKE_CREDENTIAL:
-      status = ctap2_handle_make_credential(buffer + 8, payload_len - 1,
-                                            response, &response_len);
-      break;
-
-    case CTAP2_GET_ASSERTION:
-      status = ctap2_handle_get_assertion(buffer + 8, payload_len - 1, response,
-                                          &response_len);
-      break;
-
-    default:
-      printf("CTAP2: Unsupported method 0x%02X\n", ctap_method);
-      status = CTAP2_ERR_INVALID_COMMAND;
-      break;
-    }
-
-    // Send response or error with proper error handling
-    if (status == CTAP2_OK && response_len > 0) {
-      if (!ctap_send_response(cid, cmd, response, response_len)) {
-        ERROR_REPORT_ERROR(ERROR_PROTOCOL_SEQUENCE_ERROR,
-                           "Failed to send CTAP2 response");
-        g_ctap2_ctx.state = CTAP2_STATE_ERROR;
-        return;
-      }
-    } else {
-      uint8_t error_resp[1] = {status};
-      if (!ctap_send_response(cid, cmd, error_resp, 1)) {
-        ERROR_REPORT_ERROR(ERROR_PROTOCOL_SEQUENCE_ERROR,
-                           "Failed to send CTAP2 error response");
-        g_ctap2_ctx.state = CTAP2_STATE_ERROR;
-        return;
-      }
-    }
-
-    g_ctap2_ctx.state = CTAP2_STATE_IDLE;
-
   } else {
-    ERROR_REPORT_WARNING(ERROR_PROTOCOL_UNSUPPORTED_VERSION,
-                         "Unknown CTAP2 command: 0x%02X", cmd);
-    protocol_send_error_response_ctap2(cid, CTAP2_ERR_INVALID_COMMAND);
-    g_ctap2_ctx.state = CTAP2_STATE_ERROR;
+    uint8_t error_resp[1] = {status};
+    if (!ctap_send_response(cid, cmd, error_resp, 1)) {
+      ERROR_REPORT_ERROR(ERROR_PROTOCOL_SEQUENCE_ERROR,
+                         "Failed to send CTAP2 error response");
+      g_ctap2_ctx.state = CTAP2_STATE_ERROR;
+      return;
+    }
   }
+
+  g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+}
+else {
+  ERROR_REPORT_WARNING(ERROR_PROTOCOL_UNSUPPORTED_VERSION,
+                       "Unknown CTAP2 command: 0x%02X", cmd);
+  protocol_send_error_response_ctap2(cid, CTAP2_ERR_INVALID_COMMAND);
+  g_ctap2_ctx.state = CTAP2_STATE_ERROR;
+}
 }

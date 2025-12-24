@@ -56,6 +56,7 @@
 #define CTAP2_CLIENT_PIN            0x06
 #define CTAP2_RESET                 0x07
 #define CTAP2_GET_NEXT_ASSERTION    0x08
+#define CTAPHID_CMD_APDU_TUNNEL     0x70
 
 // CTAP2 State Machine States
 typedef enum {

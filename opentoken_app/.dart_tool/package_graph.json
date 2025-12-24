@@ -217,6 +217,19 @@
       ]
     },
     {
+      "name": "cbor",
+      "version": "6.3.7",
+      "dependencies": [
+        "characters",
+        "collection",
+        "convert",
+        "hex",
+        "ieee754",
+        "meta",
+        "typed_data"
+      ]
+    },
+    {
       "name": "win32",
       "version": "5.15.0",
       "dependencies": [
@@ -382,6 +395,18 @@
       ]
     },
     {
+      "name": "ieee754",
+      "version": "1.0.3",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "hex",
+      "version": "0.2.0",
+      "dependencies": []
+    },
+    {
       "name": "path_provider_windows",
       "version": "2.3.0",
       "dependencies": [
@@ -474,31 +499,6 @@
     {
       "name": "fixnum",
       "version": "1.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "cbor",
-      "version": "6.3.7",
-      "dependencies": [
-        "characters",
-        "collection",
-        "convert",
-        "hex",
-        "ieee754",
-        "meta",
-        "typed_data"
-      ]
-    },
-    {
-      "name": "ieee754",
-      "version": "1.0.3",
-      "dependencies": [
-        "meta"
-      ]
-    },
-    {
-      "name": "hex",
-      "version": "0.2.0",
       "dependencies": []
     }
   ],

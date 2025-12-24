@@ -3,67 +3,258 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h> // For proper compilation
+#include <stdlib.h>
 #include <string.h>
 
 // Pico SDK Headers
 #include "hardware/flash.h"
+#include "hardware/structs/otp.h" // For OTP access (RP2350 specific if avail, or stub)
 #include "hardware/sync.h"
 #include "pico/stdlib.h"
 
-// Check Flash usage.
-// We will use the *last* sector of flash.
-// Default PICO_FLASH_SIZE_BYTES is often 2MB (2 * 1024 * 1024)
-// FLASH_SECTOR_SIZE is 4096 (4KB)
 
-// Determine offset. If PICO_FLASH_SIZE_BYTES is not defined, assume 2MB.
+// MbedTLS
+#include "mbedtls/gcm.h"
+#include "mbedtls/platform.h"
+
+// ----------------------------------------------------------------------------
+// Configuration
+// ----------------------------------------------------------------------------
+
 #ifndef PICO_FLASH_SIZE_BYTES
-#define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024)
+#define PICO_FLASH_SIZE_BYTES (16 * 1024 * 1024) // Default to 16MB for Tenstar
 #endif
 
-#define STORAGE_FLAG_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
-#define STORAGE_MAGIC 0xDEADBEEF
+// Storage is at the very end of flash
+#define STORAGE_OFFSET (PICO_FLASH_SIZE_BYTES - STORAGE_SIZE_BYTES)
+#define STORAGE_NONCE_SIZE 12
+#define STORAGE_TAG_SIZE 16
 
-typedef struct {
-  uint8_t pin[32];
-  uint8_t pin_len;
-  uint8_t retries_remaining;
-  uint8_t pin_hash[32];
-  uint8_t admin_pin_hash[32];
-} storage_system_t;
+// Layout of the raw flash data
+// [NONCE (12)] [TAG (16)] [ENCRYPTED_DATA (Remainder)]
+#define STORAGE_HEADER_SIZE (STORAGE_NONCE_SIZE + STORAGE_TAG_SIZE)
+#define STORAGE_PAYLOAD_SIZE (STORAGE_SIZE_BYTES - STORAGE_HEADER_SIZE)
 
-// Layout:
-// Header (Magic + Version): 8 bytes
-// OATH Entries: 8 * sizeof(entry)
-
+// The Decrypted Cache Structure
 typedef struct __attribute__((packed)) {
   uint32_t magic;
   uint32_t version;
+  storage_system_t system;
   storage_oath_entry_t oath_entries[STORAGE_OATH_MAX_ACCOUNTS];
   storage_fido2_entry_t fido2_entries[STORAGE_FIDO2_MAX_CREDS];
   storage_hsm_key_t hsm_keys[STORAGE_HSM_MAX_KEYS];
-  storage_system_t system;
-  // Future expansion...
-  uint8_t _padding[FLASH_SECTOR_SIZE - 8 -
+  // Helper to fill the rest with zeros or future usage
+  uint8_t _padding[STORAGE_PAYLOAD_SIZE - 8 - sizeof(storage_system_t) -
                    (sizeof(storage_oath_entry_t) * STORAGE_OATH_MAX_ACCOUNTS) -
                    (sizeof(storage_fido2_entry_t) * STORAGE_FIDO2_MAX_CREDS) -
-                   (sizeof(storage_hsm_key_t) * STORAGE_HSM_MAX_KEYS) -
-                   sizeof(storage_system_t)];
-} storage_flash_layout_t;
+                   (sizeof(storage_hsm_key_t) * STORAGE_HSM_MAX_KEYS)];
+} storage_cache_t;
 
-// Verify size
-_Static_assert(sizeof(storage_flash_layout_t) == FLASH_SECTOR_SIZE,
-               "Storage struct must match sector size");
+// Compile-time check to ensure cache fits in payload
+_Static_assert(sizeof(storage_cache_t) <= STORAGE_PAYLOAD_SIZE,
+               "Storage cache exceeds allocated payload size!");
 
-static storage_flash_layout_t g_cache;
+// Global RAM Cache (Decrypted)
+static storage_cache_t g_cache;
 static bool g_dirty = false;
+static bool g_initialized = false;
 
+// ----------------------------------------------------------------------------
+// Crypto Helpers
+// ----------------------------------------------------------------------------
+
+static void get_master_key(uint8_t *key_out) {
+  // TODO: Read from RP2350 OTP (Row 0x20-0x27)
+  // For now, use a fixed development key or derive from unique ID
+  // In production, this MUST read from Secure World accessible OTP only.
+  const uint8_t dev_key[32] = {0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03,
+                               0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+                               0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13,
+                               0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B};
+  memcpy(key_out, dev_key, 32);
+}
+
+static bool decrypt_storage(const uint8_t *src, storage_cache_t *dst) {
+  mbedtls_gcm_context ctx;
+  mbedtls_gcm_init(&ctx);
+
+  uint8_t key[32];
+  get_master_key(key);
+
+  int ret = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 256);
+  if (ret != 0) {
+    mbedtls_gcm_free(&ctx);
+    return false;
+  }
+
+  const uint8_t *nonce = src;
+  const uint8_t *tag = src + STORAGE_NONCE_SIZE;
+  const uint8_t *ciphertext = src + STORAGE_HEADER_SIZE;
+
+  // Authenticated Decryption
+  ret = mbedtls_gcm_auth_decrypt(
+      &ctx, STORAGE_PAYLOAD_SIZE, nonce, STORAGE_NONCE_SIZE, NULL, 0, // No AAD
+      tag, STORAGE_TAG_SIZE, ciphertext, (uint8_t *)dst);
+
+  mbedtls_gcm_free(&ctx);
+  return (ret == 0);
+}
+
+static bool encrypt_storage(const storage_cache_t *src, uint8_t *dst) {
+  mbedtls_gcm_context ctx;
+  mbedtls_gcm_init(&ctx);
+
+  uint8_t key[32];
+  get_master_key(key);
+
+  int ret = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 256);
+  if (ret != 0) {
+    mbedtls_gcm_free(&ctx);
+    return false;
+  }
+
+  uint8_t *nonce = dst;
+  uint8_t *tag = dst + STORAGE_NONCE_SIZE;
+  uint8_t *ciphertext = dst + STORAGE_HEADER_SIZE;
+
+  // Generate Nonce (Random)
+  for (int i = 0; i < STORAGE_NONCE_SIZE; i++) {
+    nonce[i] = (uint8_t)(rand() % 256); // Better RNG needed in production
+  }
+
+  ret = mbedtls_gcm_crypt_and_tag(
+      &ctx, MBEDTLS_GCM_ENCRYPT, STORAGE_PAYLOAD_SIZE, nonce,
+      STORAGE_NONCE_SIZE, NULL, 0, (const uint8_t *)src, ciphertext,
+      STORAGE_TAG_SIZE, tag);
+
+  mbedtls_gcm_free(&ctx);
+  return (ret == 0);
+}
+
+// ----------------------------------------------------------------------------
+// Core Storage API
+// ----------------------------------------------------------------------------
+
+void storage_init(void) {
+  if (g_initialized)
+    return;
+
+  printf("Storage: Initializing Encrypted Storage...\n");
+
+  const uint8_t *flash_ptr = (const uint8_t *)(XIP_BASE + STORAGE_OFFSET);
+
+  // Attempt to decrypt
+  if (decrypt_storage(flash_ptr, &g_cache)) {
+    // Decryption success, check Magic
+    if (g_cache.magic == STORAGE_MAGIC) {
+      printf("Storage: Loaded and Decrypted Successfully.\n");
+      g_initialized = true;
+      return;
+    } else {
+      printf("Storage: Valid crypto but invalid magic (First boot?). "
+             "Formatting...\n");
+    }
+  } else {
+    printf("Storage: Decryption failed (Integrity or Key mismatch). "
+           "Formatting...\n");
+  }
+
+  // Format / Reset
+  memset(&g_cache, 0, sizeof(storage_cache_t));
+  g_cache.magic = STORAGE_MAGIC;
+  g_cache.version = STORAGE_VERSION;
+
+  // Defaults
+  g_cache.system.retries_remaining = 3;
+  // PIN hashes would be set by user later
+
+  g_dirty = true;
+  g_initialized = true;
+  storage_commit();
+}
+
+void storage_commit(void) {
+  if (!g_dirty)
+    return;
+
+  // Buffer for the Encrypted Blob (needs 32KB RAM)
+  // We allocate on heap to avoid stack overflow, assuming ample heap on RP2350
+  uint8_t *chk_buffer = malloc(STORAGE_SIZE_BYTES);
+  if (!chk_buffer) {
+    ERROR_REPORT_ERROR(ERROR_OUT_OF_MEMORY,
+                       "Failed to allocate buffer for storage commit");
+    return;
+  }
+
+  printf("Storage: Encrypting and Committing...\n");
+
+  if (!encrypt_storage(&g_cache, chk_buffer)) {
+    free(chk_buffer);
+    ERROR_REPORT_ERROR(ERROR_CRYPTO_FAILURE, "Storage encryption failed");
+    return;
+  }
+
+  // Write to Flash
+  uint32_t ints = save_and_disable_interrupts();
+  flash_range_erase(STORAGE_OFFSET, STORAGE_SIZE_BYTES);
+  flash_range_program(STORAGE_OFFSET, chk_buffer, STORAGE_SIZE_BYTES);
+  restore_interrupts(ints);
+
+  free(chk_buffer);
+  g_dirty = false;
+  printf("Storage: Commit Complete.\n");
+}
+
+bool storage_reset_device(void) {
+  memset(&g_cache, 0, sizeof(storage_cache_t));
+  g_cache.magic = STORAGE_MAGIC;
+  g_cache.version = STORAGE_VERSION;
+  g_cache.system.retries_remaining = 3;
+  g_dirty = true;
+  storage_commit();
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// Get/Set Implementations
+// ----------------------------------------------------------------------------
+
+// OATH
+bool storage_load_oath_account(uint8_t index, storage_oath_entry_t *out_entry) {
+  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
+    return false;
+  if (g_cache.oath_entries[index].active != 1)
+    return false;
+  memcpy(out_entry, &g_cache.oath_entries[index], sizeof(storage_oath_entry_t));
+  return true;
+}
+
+bool storage_save_oath_account(uint8_t index,
+                               const storage_oath_entry_t *entry) {
+  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
+    return false;
+  memcpy(&g_cache.oath_entries[index], entry, sizeof(storage_oath_entry_t));
+  g_cache.oath_entries[index].active = 1;
+  g_dirty = true;
+  storage_commit();
+  return true;
+}
+
+bool storage_delete_oath_account(uint8_t index) {
+  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
+    return false;
+  memset(&g_cache.oath_entries[index], 0, sizeof(storage_oath_entry_t));
+  g_dirty = true;
+  storage_commit();
+  return true;
+}
+
+// FIDO2
 bool storage_load_fido2_cred(uint8_t index, storage_fido2_entry_t *out_entry) {
   if (index >= STORAGE_FIDO2_MAX_CREDS)
     return false;
   if (g_cache.fido2_entries[index].active != 1)
     return false;
-
   memcpy(out_entry, &g_cache.fido2_entries[index],
          sizeof(storage_fido2_entry_t));
   return true;
@@ -73,7 +264,6 @@ bool storage_save_fido2_cred(uint8_t index,
                              const storage_fido2_entry_t *entry) {
   if (index >= STORAGE_FIDO2_MAX_CREDS)
     return false;
-
   memcpy(&g_cache.fido2_entries[index], entry, sizeof(storage_fido2_entry_t));
   g_cache.fido2_entries[index].active = 1;
   g_dirty = true;
@@ -84,7 +274,6 @@ bool storage_save_fido2_cred(uint8_t index,
 bool storage_delete_fido2_cred(uint8_t index) {
   if (index >= STORAGE_FIDO2_MAX_CREDS)
     return false;
-
   memset(&g_cache.fido2_entries[index], 0, sizeof(storage_fido2_entry_t));
   g_dirty = true;
   storage_commit();
@@ -124,79 +313,12 @@ uint8_t storage_find_fido2_creds_all_by_rp(const uint8_t *rp_id_hash,
   return count;
 }
 
-void storage_init(void) {
-  // Read flash into cache
-  const uint8_t *flash_target_contents =
-      (const uint8_t *)(XIP_BASE + STORAGE_FLAG_OFFSET);
-  memcpy(&g_cache, flash_target_contents, sizeof(storage_flash_layout_t));
-
-  if (g_cache.magic != STORAGE_MAGIC) {
-    printf("Storage: No valid storage found (Magic: %08X). formatting...\n",
-           g_cache.magic);
-    memset(&g_cache, 0, sizeof(storage_flash_layout_t));
-    g_cache.magic = STORAGE_MAGIC;
-    g_cache.version = 1;
-
-    // Initialize PIN data with default values
-    g_cache.system.retries_remaining = 3; // HSM_PIN_MAX_RETRIES
-    // Default PIN hash for "123456"
-    const uint8_t default_pin[] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36};
-    // Simple hash for demo - in production use proper PBKDF2/scrypt
-    memset(g_cache.system.pin_hash, 0, 32);
-    memcpy(g_cache.system.pin_hash, default_pin, sizeof(default_pin));
-
-    // Default admin PIN hash for "12345678"
-    const uint8_t default_admin_pin[] = {0x31, 0x32, 0x33, 0x34,
-                                         0x35, 0x36, 0x37, 0x38};
-    memset(g_cache.system.admin_pin_hash, 0, 32);
-    memcpy(g_cache.system.admin_pin_hash, default_admin_pin,
-           sizeof(default_admin_pin));
-
-    g_dirty = true;
-    storage_commit();
-  } else {
-    printf("Storage: Valid storage loaded.\n");
-  }
-}
-
-bool storage_load_oath_account(uint8_t index, storage_oath_entry_t *out_entry) {
-  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
-    return false;
-  if (g_cache.oath_entries[index].active != 1)
-    return false;
-
-  memcpy(out_entry, &g_cache.oath_entries[index], sizeof(storage_oath_entry_t));
-  return true;
-}
-
-bool storage_save_oath_account(uint8_t index,
-                               const storage_oath_entry_t *entry) {
-  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
-    return false;
-
-  memcpy(&g_cache.oath_entries[index], entry, sizeof(storage_oath_entry_t));
-  g_cache.oath_entries[index].active = 1;
-  g_dirty = true;
-  storage_commit();
-  return true;
-}
-
-bool storage_delete_oath_account(uint8_t index) {
-  if (index >= STORAGE_OATH_MAX_ACCOUNTS)
-    return false;
-
-  memset(&g_cache.oath_entries[index], 0, sizeof(storage_oath_entry_t));
-  g_dirty = true;
-  storage_commit();
-  return true;
-}
-
+// HSM
 bool storage_load_hsm_key(uint8_t slot, storage_hsm_key_t *out_key) {
   if (slot >= STORAGE_HSM_MAX_KEYS)
     return false;
   if (g_cache.hsm_keys[slot].active != 1)
     return false;
-
   memcpy(out_key, &g_cache.hsm_keys[slot], sizeof(storage_hsm_key_t));
   return true;
 }
@@ -204,7 +326,6 @@ bool storage_load_hsm_key(uint8_t slot, storage_hsm_key_t *out_key) {
 bool storage_save_hsm_key(uint8_t slot, const storage_hsm_key_t *key) {
   if (slot >= STORAGE_HSM_MAX_KEYS)
     return false;
-
   memcpy(&g_cache.hsm_keys[slot], key, sizeof(storage_hsm_key_t));
   g_cache.hsm_keys[slot].active = 1;
   g_dirty = true;
@@ -215,81 +336,21 @@ bool storage_save_hsm_key(uint8_t slot, const storage_hsm_key_t *key) {
 bool storage_delete_hsm_key(uint8_t slot) {
   if (slot >= STORAGE_HSM_MAX_KEYS)
     return false;
-
   memset(&g_cache.hsm_keys[slot], 0, sizeof(storage_hsm_key_t));
   g_dirty = true;
   storage_commit();
   return true;
 }
 
-bool storage_load_pin_data(storage_pin_data_t *out_data) {
-  out_data->retries_remaining = g_cache.system.retries_remaining;
-  memcpy(out_data->pin_hash, g_cache.system.pin_hash, 32);
-  memcpy(out_data->admin_pin_hash, g_cache.system.admin_pin_hash, 32);
+// System
+bool storage_load_pin_data(storage_system_t *out_data) {
+  memcpy(out_data, &g_cache.system, sizeof(storage_system_t));
   return true;
 }
 
-bool storage_save_pin_data(const storage_pin_data_t *data) {
-  g_cache.system.retries_remaining = data->retries_remaining;
-  memcpy(g_cache.system.pin_hash, data->pin_hash, 32);
-  memcpy(g_cache.system.admin_pin_hash, data->admin_pin_hash, 32);
+bool storage_save_pin_data(const storage_system_t *data) {
+  memcpy(&g_cache.system, data, sizeof(storage_system_t));
   g_dirty = true;
   storage_commit();
-  return true;
-}
-
-void storage_commit(void) {
-  if (!g_dirty)
-    return;
-
-  printf("Storage: Committing to Flash with error handling...\n");
-
-  // Start timeout for flash operation
-  if (!timeout_start(5000)) { // 5 second timeout for flash operations
-    ERROR_REPORT_ERROR(ERROR_TIMEOUT_PROTOCOL_RESPONSE,
-                       "Failed to start flash timeout");
-    return;
-  }
-
-  // Disable interrupts to prevent crash during flash write (XIP is unavailable)
-  uint32_t ints = save_and_disable_interrupts();
-
-  // Attempt flash erase (returns void in Pico SDK)
-  flash_range_erase(STORAGE_FLAG_OFFSET, FLASH_SECTOR_SIZE);
-
-  // Attempt flash program (returns void in Pico SDK)
-  flash_range_program(STORAGE_FLAG_OFFSET, (const uint8_t *)&g_cache,
-                      FLASH_SECTOR_SIZE);
-
-  restore_interrupts(ints);
-  timeout_reset();
-  g_dirty = false;
-  printf("Storage: Commit completed successfully.\n");
-}
-
-bool storage_reset_device(void) {
-  printf("Storage: Performing full device reset (secure erase)...\n");
-
-  // Wipe cache and re-initialize with defaults
-  memset(&g_cache, 0, sizeof(storage_flash_layout_t));
-  g_cache.magic = STORAGE_MAGIC;
-  g_cache.version = 1;
-
-  // Initialize PIN data with default values (same as storage_init)
-  g_cache.system.retries_remaining = 3;
-  const uint8_t default_pin[] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36};
-  memset(g_cache.system.pin_hash, 0, 32);
-  memcpy(g_cache.system.pin_hash, default_pin, sizeof(default_pin));
-
-  const uint8_t default_admin_pin[] = {0x31, 0x32, 0x33, 0x34,
-                                       0x35, 0x36, 0x37, 0x38};
-  memset(g_cache.system.admin_pin_hash, 0, 32);
-  memcpy(g_cache.system.admin_pin_hash, default_admin_pin,
-         sizeof(default_admin_pin));
-
-  g_dirty = true;
-  storage_commit(); // This erases and re-writes the flash sector
-
-  printf("Storage: Device reset completed.\n");
   return true;
 }

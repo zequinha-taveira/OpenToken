@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:opentoken_dart/opentoken_service.dart';
-import 'package:opentoken_dart/transports/transport_nfc.dart';
 import 'package:opentoken_dart/transports/transport_usb.dart';
-import 'dart:io';
 import 'dart:async';
 
 import 'theme.dart';
@@ -75,27 +73,18 @@ class _MainNavigationState extends State<MainNavigation> {
 
   /// Initialize and connect to OpenToken device
   Future<void> _initializeDevice() async {
-    final bool isMobile = Platform.isAndroid || Platform.isIOS;
+    // Desktop uses USB HID
+    _transportName = "USB";
+    _transport = UsbTransport(vendorId: usbVid, productId: usbPid);
+    _service = OpenTokenSharedService(_transport);
 
-    if (isMobile) {
-      // Mobile uses NFC - connection happens on tap
-      _transportName = "NFC";
-      final nfcTransport = NfcTransport();
-      _service = OpenTokenSharedService(nfcTransport);
-    } else {
-      // Desktop uses USB HID
-      _transportName = "USB";
-      _transport = UsbTransport(vendorId: usbVid, productId: usbPid);
-      _service = OpenTokenSharedService(_transport);
+    // Try to connect to device
+    await _connectToDevice();
 
-      // Try to connect to device
-      await _connectToDevice();
-
-      // Start polling for device connection changes
-      _devicePollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-        _checkDeviceConnection();
-      });
-    }
+    // Start polling for device connection changes
+    _devicePollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _checkDeviceConnection();
+    });
   }
 
   /// Connect to USB device

@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
 import '../opentoken_service.dart';
+import 'windows_hid_driver.dart';
 
 /// OpenToken USB Device identifiers
 const int OPENTOKEN_VID = 0xCAFE; // Test VID (TODO: Register official)
@@ -227,34 +228,8 @@ class UsbTransport implements OpenTokenTransport {
   /// Send APDU via CCID encapsulation
   @override
   Future<Uint8List> sendApdu(Uint8List apdu) async {
-    if (!_isConnected) {
-      throw StateError('Device not connected');
-    }
-
-    // CCID PC_to_RDR_XfrBlock message format
-    // [MessageType, Length(4), Slot, Seq, BWI, LevelParameter(2), APDU...]
-    final ccidMessage = Uint8List(10 + apdu.length);
-    ccidMessage[0] = 0x6F; // PC_to_RDR_XfrBlock
-    ccidMessage[1] = apdu.length & 0xFF;
-    ccidMessage[2] = (apdu.length >> 8) & 0xFF;
-    ccidMessage[3] = (apdu.length >> 16) & 0xFF;
-    ccidMessage[4] = (apdu.length >> 24) & 0xFF;
-    ccidMessage[5] = 0x00; // Slot
-    ccidMessage[6] = 0x00; // Sequence (TODO: increment)
-    ccidMessage[7] = 0x00; // BWI
-    ccidMessage[8] = 0x00; // Level Parameter (low)
-    ccidMessage[9] = 0x00; // Level Parameter (high)
-    ccidMessage.setRange(10, 10 + apdu.length, apdu);
-
-    // Send HID report
-    final response = await _hidWrite(ccidMessage);
-
-    // Parse CCID response
-    if (response.length > 10) {
-      return Uint8List.fromList(response.sublist(10));
-    }
-
-    return Uint8List.fromList([0x6A, 0x82]); // Error response
+    // Send APDU using the custom Tunnel command (0x70) over CTAPHID
+    return sendCtapHid(0x70, apdu);
   }
 
   /// Send CTAP HID / WebUSB command
@@ -264,12 +239,49 @@ class UsbTransport implements OpenTokenTransport {
       throw StateError('Device not connected');
     }
 
-    // Simple command format: [CMD, ...payload]
-    final frame = Uint8List(1 + payload.length);
-    frame[0] = command;
-    frame.setRange(1, frame.length, payload);
+    // CCID/CTAP Headers are mandatory
+    // Packet: [CID(4), CMD(1), LEN(2), PAYLOAD(57)] = 64 bytes
 
-    return await _hidWrite(frame);
+    final packet = Uint8List(64);
+    final data = ByteData.view(packet.buffer);
+
+    // CID: Use Broadcast (0xFFFFFFFF) for simplicity in this driverless mode
+    // In a full implementation, we would perform INIT and get a CID.
+    data.setUint32(0, 0xFFFFFFFF, Endian.little);
+
+    // CMD: Set the Init flag (0x80)
+    data.setUint8(4, command | 0x80);
+
+    // LEN: Payload length (Big Endian)
+    data.setUint16(5, payload.length, Endian.big);
+
+    // PAYLOAD
+    int bytesToCopy = payload.length;
+    if (bytesToCopy > 57) {
+      bytesToCopy = 57; // Limit to single packet for this implementation
+    }
+
+    packet.setRange(7, 7 + bytesToCopy, payload.sublist(0, bytesToCopy));
+
+    // Write to device
+    final responseWithHeader = await _hidWrite(packet);
+
+    // Parse Response
+    // [CID(4), CMD(1), LEN(2), DATA...]
+    if (responseWithHeader.length < 7) {
+      return Uint8List(0);
+    }
+
+    // Extract length
+    final respData = ByteData.view(responseWithHeader.buffer);
+    int dataLen = respData.getUint16(5, Endian.big);
+
+    // Safety clamp
+    if (dataLen > responseWithHeader.length - 7) {
+      dataLen = responseWithHeader.length - 7;
+    }
+
+    return responseWithHeader.sublist(7, 7 + dataLen);
   }
 
   /// Low-level HID write/read

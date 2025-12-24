@@ -126,7 +126,7 @@ hsm_pin_result_t hsm_verify_pin_secure(const uint8_t *pin_in,
                                        uint16_t pin_len) {
   printf("HSM: Verifying PIN securely.\n");
 
-  storage_pin_data_t pin_data;
+  storage_system_t pin_data;
   if (!storage_load_pin_data(&pin_data)) {
     return HSM_PIN_ERROR;
   }
@@ -164,7 +164,7 @@ hsm_pin_result_t hsm_verify_pin_secure(const uint8_t *pin_in,
 }
 
 uint8_t hsm_get_pin_retries_remaining(void) {
-  storage_pin_data_t pin_data;
+  storage_system_t pin_data;
   if (!storage_load_pin_data(&pin_data)) {
     return 0;
   }
@@ -174,7 +174,7 @@ uint8_t hsm_get_pin_retries_remaining(void) {
 bool hsm_reset_pin_counter(const uint8_t *admin_pin, uint16_t admin_pin_len) {
   printf("HSM: Attempting to reset PIN counter with admin PIN.\n");
 
-  storage_pin_data_t pin_data;
+  storage_system_t pin_data;
   if (!storage_load_pin_data(&pin_data)) {
     return false;
   }
