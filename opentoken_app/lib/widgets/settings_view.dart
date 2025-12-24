@@ -48,7 +48,7 @@ class _SettingsViewState extends State<SettingsView> {
           // ═══════════════════════════════════════════════════════════════════
           // DEVICE SECTION
           // ═══════════════════════════════════════════════════════════════════
-          _SectionHeader(title: "Device"),
+          const _SectionHeader(title: "Device"),
           const SizedBox(height: OpenTokenTheme.space4),
 
           _NavigationTile(
@@ -76,7 +76,7 @@ class _SettingsViewState extends State<SettingsView> {
           // ═══════════════════════════════════════════════════════════════════
           // SECURITY SECTION
           // ═══════════════════════════════════════════════════════════════════
-          _SectionHeader(title: "Security"),
+          const _SectionHeader(title: "Security"),
           const SizedBox(height: OpenTokenTheme.space4),
 
           _NavigationTile(
@@ -103,7 +103,7 @@ class _SettingsViewState extends State<SettingsView> {
           // ═══════════════════════════════════════════════════════════════════
           // APPLICATION SECTION
           // ═══════════════════════════════════════════════════════════════════
-          _SectionHeader(title: "Application"),
+          const _SectionHeader(title: "Application"),
           const SizedBox(height: OpenTokenTheme.space4),
 
           _SettingsTile(
@@ -135,7 +135,7 @@ class _SettingsViewState extends State<SettingsView> {
           // ═══════════════════════════════════════════════════════════════════
           // ABOUT SECTION
           // ═══════════════════════════════════════════════════════════════════
-          _SectionHeader(title: "About"),
+          const _SectionHeader(title: "About"),
           const SizedBox(height: OpenTokenTheme.space4),
 
           _buildAboutCard(),
@@ -335,11 +335,11 @@ class _SettingsViewState extends State<SettingsView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: OpenTokenTheme.surfaceCard,
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: OpenTokenTheme.error),
-            const SizedBox(width: 12),
-            const Text("Factory Reset"),
+            SizedBox(width: 12),
+            Text("Factory Reset"),
           ],
         ),
         content: const Text(
@@ -574,7 +574,7 @@ class _ToggleTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: OpenTokenTheme.primary,
+            activeThumbColor: OpenTokenTheme.primary,
             activeTrackColor: OpenTokenTheme.primary.withOpacity(0.3),
             inactiveThumbColor: Colors.white38,
             inactiveTrackColor: Colors.white.withOpacity(0.1),

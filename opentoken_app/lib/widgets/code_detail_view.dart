@@ -343,9 +343,9 @@ class _CodeDetailViewState extends State<CodeDetailView> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: widget.onDelete,
-                    icon: Icon(Icons.delete,
+                    icon: const Icon(Icons.delete,
                         size: 18, color: OpenTokenTheme.error),
-                    label: Text("Delete",
+                    label: const Text("Delete",
                         style: TextStyle(color: OpenTokenTheme.error)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: OpenTokenTheme.error,

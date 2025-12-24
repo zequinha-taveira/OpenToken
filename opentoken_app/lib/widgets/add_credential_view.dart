@@ -604,7 +604,7 @@ class _AddCredentialViewState extends State<AddCredentialView> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          const Icon(
             Icons.lock_person_outlined,
             color: OpenTokenTheme.primary,
             size: 24,

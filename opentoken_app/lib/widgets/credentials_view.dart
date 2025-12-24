@@ -187,10 +187,10 @@ class _CredentialsViewState extends State<CredentialsView> {
                   },
                   onCopy: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      const SnackBar(
                         content: Text('Code copied to clipboard'),
                         backgroundColor: OpenTokenTheme.surfaceElevated,
-                        duration: const Duration(seconds: 2),
+                        duration: Duration(seconds: 2),
                       ),
                     );
                   },

@@ -50,13 +50,13 @@ class _MainNavigationState extends State<MainNavigation> {
   bool _isConnected = false;
   String _transportName = "USB";
   String _firmwareVersion = "Unknown";
-  String _serialNumber = "Not Connected";
+  final String _serialNumber = "Not Connected";
   int _slotsUsed = 0;
   int _slotsMax = 200;
 
   // Credential data (from device)
   List<Map<String, String>> _accounts = [];
-  Map<String, String> _codes = {};
+  final Map<String, String> _codes = {};
   double _progress = 1.0;
   Timer? _timer;
   Timer? _devicePollTimer;
@@ -458,7 +458,7 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       child: Row(
         children: [
-          Icon(Icons.shield, color: OpenTokenTheme.primary, size: 28),
+          const Icon(Icons.shield, color: OpenTokenTheme.primary, size: 28),
           const SizedBox(width: 12),
           Text(
             "OpenToken Authenticator",
@@ -620,7 +620,7 @@ class _SidebarItem extends StatelessWidget {
                   width: 4,
                   height: 4,
                   margin: const EdgeInsets.only(left: 8),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                       color: OpenTokenTheme.primary, shape: BoxShape.circle),
                 ),
             ],
