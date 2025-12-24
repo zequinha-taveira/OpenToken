@@ -12,7 +12,6 @@
 #include "hardware/sync.h"
 #include "pico/stdlib.h"
 
-
 // MbedTLS
 #include "mbedtls/gcm.h"
 #include "mbedtls/platform.h"
@@ -59,19 +58,27 @@ static storage_cache_t g_cache;
 static bool g_dirty = false;
 static bool g_initialized = false;
 
-// ----------------------------------------------------------------------------
-// Crypto Helpers
-// ----------------------------------------------------------------------------
+#include "mbedtls/sha256.h"
+#include "pico/unique_id.h"
+
 
 static void get_master_key(uint8_t *key_out) {
-  // TODO: Read from RP2350 OTP (Row 0x20-0x27)
-  // For now, use a fixed development key or derive from unique ID
-  // In production, this MUST read from Secure World accessible OTP only.
-  const uint8_t dev_key[32] = {0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03,
-                               0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-                               0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13,
-                               0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B};
-  memcpy(key_out, dev_key, 32);
+  // Use RP2350 Unique Board ID to derive a device-specific key
+  pico_unique_board_id_t id;
+  pico_get_unique_board_id(&id);
+
+  // Hash the unique ID with a salt to create the master key
+  // In a real production environment, this should incorporate OTP secrets
+  // that are only readable by the Secure World.
+  const char *salt = "OpenToken-Master-Key-Salt-v1";
+
+  mbedtls_sha256_context sha_ctx;
+  mbedtls_sha256_init(&sha_ctx);
+  mbedtls_sha256_starts(&sha_ctx, 0); // SHA-256
+  mbedtls_sha256_update(&sha_ctx, (const uint8_t *)id.id, 8);
+  mbedtls_sha256_update(&sha_ctx, (const uint8_t *)salt, strlen(salt));
+  mbedtls_sha256_finish(&sha_ctx, key_out);
+  mbedtls_sha256_free(&sha_ctx);
 }
 
 static bool decrypt_storage(const uint8_t *src, storage_cache_t *dst) {

@@ -12,6 +12,8 @@ import 'widgets/device_status_view.dart';
 import 'widgets/settings_view.dart';
 
 void main() {
+  // Ensure 100% offline operation by disabling font fetching from Google APIs
+  GoogleFonts.config.allowRuntimeFetching = false;
   runApp(const OpenTokenApp());
 }
 

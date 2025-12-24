@@ -142,25 +142,6 @@ class _SettingsViewState extends State<SettingsView> {
 
           const SizedBox(height: OpenTokenTheme.space4),
 
-          _NavigationTile(
-            title: "Documentation",
-            subtitle: "View guides and API reference",
-            icon: Icons.menu_book,
-            onTap: () {},
-          ),
-          _NavigationTile(
-            title: "Report Bug",
-            subtitle: "Submit an issue on GitHub",
-            icon: Icons.bug_report,
-            onTap: () {},
-          ),
-          _NavigationTile(
-            title: "Feature Request",
-            subtitle: "Suggest new features",
-            icon: Icons.lightbulb_outline,
-            onTap: () {},
-          ),
-
           const SizedBox(height: OpenTokenTheme.space7),
 
           // Footer
@@ -244,7 +225,7 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Security Without Chains",
+                      "Sovereign Security - 100% Offline",
                       style: GoogleFonts.inter(
                         color: Colors.white54,
                         fontSize: OpenTokenTheme.textSm,
@@ -261,8 +242,7 @@ class _SettingsViewState extends State<SettingsView> {
           _buildInfoRow("App Version", "1.0.0"),
           _buildInfoRow("Protocol Version", "1.0"),
           _buildInfoRow("License", "MIT"),
-          _buildInfoRow("Website", "opentoken.dev"),
-          _buildInfoRow("GitHub", "github.com/opentoken"),
+          _buildInfoRow("Privacy", "Hardware & Local Only"),
         ],
       ),
     );
@@ -306,23 +286,27 @@ class _SettingsViewState extends State<SettingsView> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_off, color: Colors.white24, size: 16),
-          const SizedBox(width: OpenTokenTheme.space2),
+          const Icon(Icons.cloud_off,
+              color: OpenTokenTheme.secondary, size: 20),
+          const SizedBox(width: OpenTokenTheme.space3),
           Expanded(
-            child: Text(
-              "Offline First. No data leaves this machine.",
-              style: GoogleFonts.inter(color: Colors.white24, fontSize: 11),
-            ),
-          ),
-          TextButton(
-            onPressed: () {},
-            child: Text(
-              "View Source on GitHub",
-              style: GoogleFonts.inter(
-                color: OpenTokenTheme.primary,
-                fontSize: 11,
-                fontWeight: OpenTokenTheme.fontSemibold,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "100% OFFLINE & SOVEREIGN",
+                  style: GoogleFonts.inter(
+                    color: OpenTokenTheme.secondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Keys are stored only on your hardware and local device. No APIs, no clouds.",
+                  style: GoogleFonts.inter(color: Colors.white38, fontSize: 10),
+                ),
+              ],
             ),
           ),
         ],
