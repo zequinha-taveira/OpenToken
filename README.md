@@ -56,7 +56,7 @@ Integrated a WS2812 RGB LED driver (GP22) to provide visual feedback for common 
 
 ## 🔌 Compatibilidade
 
-O OpenToken é projetado para seguir padrões abertos da indústria (FIDO2, CCID/ISO7816), o que garante compatibilidade com a maioria dos softwares:
+OpenToken comunica-se através de protocolos padrão para garantir a máxima compatibilidade sem drivers proprietários. O projeto segue padrões abertos da indústria (FIDO2, CCID/ISO7816), o que garante compatibilidade com a maioria dos softwares:
 
 *   **OpenToken NATIVO App**: Experiência oficial e otimizada para Desktop e Mobile.
 *   **FIDO2 WebAuthn**: Compatível com navegadores modernos (Chrome, Edge, Firefox) e contas Microsoft/Google.

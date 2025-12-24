@@ -1,6 +1,6 @@
 # Arquitetura do Sistema OpenToken
 
-Este diagrama ilustra como o firmware OpenToken organiza as interfaces USB e processa os diferentes protocolos.
+O OpenToken comunica-se através de protocolos padrão para garantir a máxima compatibilidade sem drivers proprietários. Este diagrama ilustra como o firmware OpenToken organiza as interfaces USB e processa os diferentes protocolos.
 
 ```mermaid
 graph TD
