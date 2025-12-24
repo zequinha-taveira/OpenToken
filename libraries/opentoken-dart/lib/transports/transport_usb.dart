@@ -10,8 +10,8 @@ import '../opentoken_service.dart';
 import 'windows_hid_driver.dart';
 
 /// OpenToken USB Device identifiers
-const int OPENTOKEN_VID = 0xCAFE; // Test VID (TODO: Register official)
-const int OPENTOKEN_PID = 0x4004; // OpenToken Product ID
+const int OPENTOKEN_VID = 0x1209; // pid.codes - Open Source Hardware VID
+const int OPENTOKEN_PID = 0x0001; // Generic security token PID
 
 /// USB HID Transport for Windows Desktop
 /// Communicates with the RP2350 firmware via USB HID

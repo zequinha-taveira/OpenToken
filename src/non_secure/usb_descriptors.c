@@ -31,7 +31,7 @@
 tusb_desc_device_t const desc_device = {
     .bLength = sizeof(tusb_desc_device_t),
     .bDescriptorType = TUSB_DESC_DEVICE,
-    .bcdUSB = 0x0200, // USB 2.0
+    .bcdUSB = 0x0210, // USB 2.1 (Required for BOS/WebUSB)
 
     // Composite Device Configuration
     .bDeviceClass = TUSB_CLASS_MISC,

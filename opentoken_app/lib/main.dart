@@ -41,8 +41,8 @@ class _MainNavigationState extends State<MainNavigation> {
   bool _isAddingCredential = false;
 
   // Global USB configuration
-  static const int usbVid = 0xCAFE;
-  static const int usbPid = 0x4004;
+  static const int usbVid = 0x1209;
+  static const int usbPid = 0x0001;
 
   // Device state
   late UsbTransport _transport;
