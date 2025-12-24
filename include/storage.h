@@ -20,6 +20,7 @@ typedef struct {
   uint8_t name_len;
   uint8_t key[64];
   uint8_t key_len;
+  uint8_t prop;     // Properties (Type/Algo)
   uint8_t type;     // 1=TOTP, 2=HOTP
   uint8_t digits;   // 6 or 8
   uint8_t active;   // 1 if active
