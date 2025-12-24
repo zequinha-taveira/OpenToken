@@ -15,6 +15,10 @@
 // MbedTLS
 #include "mbedtls/gcm.h"
 #include "mbedtls/platform.h"
+#include "mbedtls/sha256.h"
+
+// Pico SDK
+#include "pico/unique_id.h"
 
 // ----------------------------------------------------------------------------
 // Configuration
@@ -57,10 +61,6 @@ _Static_assert(sizeof(storage_cache_t) <= STORAGE_PAYLOAD_SIZE,
 static storage_cache_t g_cache;
 static bool g_dirty = false;
 static bool g_initialized = false;
-
-#include "mbedtls/sha256.h"
-#include "pico/unique_id.h"
-
 
 static void get_master_key(uint8_t *key_out) {
   // Use RP2350 Unique Board ID to derive a device-specific key

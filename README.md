@@ -7,6 +7,7 @@
    [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
    [![Protocol](https://img.shields.io/badge/protocol-FIDO2%2C%20OATH%2C%20OpenPGP-blueviolet)](#-funcionalidades)
    [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/zequinha-taveira/OpenToken)
+   [![Privacy](https://img.shields.io/badge/privacy-100%25%20OFFLINE-green)](#-privacidade-soberana)
    [![Eco](https://img.shields.io/badge/ecosystem-NATIVO-red)](#-opentoken-nativo)
 
   ---
