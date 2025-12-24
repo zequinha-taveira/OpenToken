@@ -19,11 +19,19 @@ OpenToken é um firmware de segurança de alto desempenho desenvolvido especific
 
 O OpenToken foi projetado com uma filosofia de *Security by Design*, dividindo o hardware em domínios lógicos:
 
-*   **Secure Storage**: Armazenamento em Flash isolado para segredos e credenciais.
+*   **Hardware Unique ID Binding**: O sistema deriva sua chave mestra (AES-GCM 256-bit) do identificador único do silício do RP2350. Isso garante que os dados sejam ilegíveis se movidos para outro chip.
+*   **Secure Storage**: Armazenamento em Flash isolado e criptografado para segredos e credenciais.
 *   **HSM Layer**: Uma camada de abstração criptográfica que interage diretamente com o hardware para operações de chave privada.
 *   **TrustZone Separation**: Separação física de recursos (Flash, RAM, Periféricos) entre Mundo Seguro e Mundo Não-Seguro.
-*   **Factory Backend**: Assinatura offline de firmware (Sovereign Supply Chain) garantindo que apenas código autorizado seja executado.
-*   **Protocol Engines**: Motores de estado independentes para lidar com diferentes fluxos de autenticação sem vazamento de contexto.
+*   **Sovereign Supply Chain**: Assinatura offline de firmware garantindo que apenas código autorizado seja executado.
+
+## 🔒 Privacidade Soberana (100% Offline)
+
+O ecossistema OpenToken é construído para operar em isolamento total:
+
+*   **Zero Network Calls**: O aplicativo autenticador não possui permissões de internet e não realiza chamadas para APIs externas ou telemetria.
+*   **Local Assets**: Todos os recursos (incluindo fontes e ícones) são embarcados localmente para garantir funcionamento em ambientes *air-gapped*.
+*   **No Cloud Dependency**: Seus segredos nunca saem do hardware. Não há sincronização em nuvem, garantindo soberania total sobre sua identidade digital.
 
 ## 🚀 Funcionalidades Principais
 
@@ -93,7 +101,8 @@ cmake --build build
 - [x] Integração com mbedTLS 3.x para RP2350
 - [x] Engine básica para FIDO2/CTAP2
 - [x] Implementação completa de Residente Keys (RK) no FIDO2
-- [x] Suporte para criptografia de chaves via Hardware Root of Trust
+- [x] Criptografia de chaves via Hardware Unique ID (RP2350)
+- [x] Hardening de Privacidade (100% Offline & No-API)
 - [x] Interface de gerenciamento via WebUSB
 
 ## 🤝 Contribuição
