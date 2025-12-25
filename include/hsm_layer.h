@@ -42,6 +42,9 @@ typedef struct {
 // Initialize HSM layer
 void hsm_init(void);
 
+// Get cryptographically secure random bytes
+bool hsm_get_random(uint8_t *out, size_t len);
+
 // Operações de Chave (FIDO2/OpenPGP)
 // Generate ECC P-256 keypair and store in secure slot
 bool hsm_generate_key_ecc(hsm_key_slot_t slot, hsm_pubkey_t *pubkey_out);

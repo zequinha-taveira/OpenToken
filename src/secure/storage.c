@@ -1,5 +1,6 @@
 #include "storage.h"
 #include "error_handling.h"
+#include "hsm_layer.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,7 +15,10 @@
 
 // MbedTLS
 #include "mbedtls/gcm.h"
+#include "mbedtls/hkdf.h"
+#include "mbedtls/md.h"
 #include "mbedtls/platform.h"
+#include "mbedtls/platform_util.h"
 #include "mbedtls/sha256.h"
 
 // Pico SDK
@@ -67,18 +71,18 @@ static void get_master_key(uint8_t *key_out) {
   pico_unique_board_id_t id;
   pico_get_unique_board_id(&id);
 
-  // Hash the unique ID with a salt to create the master key
-  // In a real production environment, this should incorporate OTP secrets
-  // that are only readable by the Secure World.
-  const char *salt = "OpenToken-Master-Key-Salt-v1";
+  // Derive key using HKDF-SHA256 of the board ID
+  const mbedtls_md_info_t *md_info =
+      mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+  const char *salt = "OpenToken-Storage-Master-Salt-v1";
+  const char *info = "MasterStorageEncryptionKey";
 
-  mbedtls_sha256_context sha_ctx;
-  mbedtls_sha256_init(&sha_ctx);
-  mbedtls_sha256_starts(&sha_ctx, 0); // SHA-256
-  mbedtls_sha256_update(&sha_ctx, (const uint8_t *)id.id, 8);
-  mbedtls_sha256_update(&sha_ctx, (const uint8_t *)salt, strlen(salt));
-  mbedtls_sha256_finish(&sha_ctx, key_out);
-  mbedtls_sha256_free(&sha_ctx);
+  if (mbedtls_hkdf(md_info, (const unsigned char *)salt, strlen(salt), id.id, 8,
+                   (const unsigned char *)info, strlen(info), key_out,
+                   32) != 0) {
+    printf("Storage: HKDF Master Key derivation failed!\n");
+    // Fallback or panic
+  }
 }
 
 static bool decrypt_storage(const uint8_t *src, storage_cache_t *dst) {
@@ -103,6 +107,7 @@ static bool decrypt_storage(const uint8_t *src, storage_cache_t *dst) {
       &ctx, STORAGE_PAYLOAD_SIZE, nonce, STORAGE_NONCE_SIZE, NULL, 0, // No AAD
       tag, STORAGE_TAG_SIZE, ciphertext, (uint8_t *)dst);
 
+  mbedtls_platform_zeroize(key, 32);
   mbedtls_gcm_free(&ctx);
   return (ret == 0);
 }
@@ -124,9 +129,11 @@ static bool encrypt_storage(const storage_cache_t *src, uint8_t *dst) {
   uint8_t *tag = dst + STORAGE_NONCE_SIZE;
   uint8_t *ciphertext = dst + STORAGE_HEADER_SIZE;
 
-  // Generate Nonce (Random)
-  for (int i = 0; i < STORAGE_NONCE_SIZE; i++) {
-    nonce[i] = (uint8_t)(rand() % 256); // Better RNG needed in production
+  // Generate Nonce (Secure Random)
+  if (!hsm_get_random(nonce, STORAGE_NONCE_SIZE)) {
+    mbedtls_platform_zeroize(key, 32);
+    mbedtls_gcm_free(&ctx);
+    return false;
   }
 
   ret = mbedtls_gcm_crypt_and_tag(
@@ -134,6 +141,7 @@ static bool encrypt_storage(const storage_cache_t *src, uint8_t *dst) {
       STORAGE_NONCE_SIZE, NULL, 0, (const uint8_t *)src, ciphertext,
       STORAGE_TAG_SIZE, tag);
 
+  mbedtls_platform_zeroize(key, 32);
   mbedtls_gcm_free(&ctx);
   return (ret == 0);
 }

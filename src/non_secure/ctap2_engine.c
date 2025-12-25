@@ -4,6 +4,12 @@
 #include "error_handling.h"
 #include "hsm_layer.h"
 #include "led_status.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/md.h"
+#include "mbedtls/platform_util.h"
+#include "mbedtls/sha1.h"
+#include "mbedtls/sha256.h"
 #include "storage.h"
 #include "tusb.h"
 #include <stdbool.h>
@@ -43,6 +49,7 @@ void ctap2_engine_init(void) {
   printf("CTAP2: Initializing engine\n");
   memset(&g_ctap2_ctx, 0, sizeof(g_ctap2_ctx));
   g_ctap2_ctx.state = CTAP2_STATE_IDLE;
+  hsm_init(); // Ensure HSM is initialized
 }
 
 // Helper to encode ECC Public Key as COSE Map
@@ -73,13 +80,16 @@ static bool ctap_encode_cose_key(cbor_encoder_t *enc, const hsm_pubkey_t *pub) {
   return true;
 }
 
-// Helper to build FIDO2 authData
-static uint16_t ctap_build_authdata(uint8_t *out, const uint8_t *rp_id_hash,
-                                    uint8_t flags, uint32_t counter,
-                                    const uint8_t *cred_id,
+// Helper to build FIDO2 authData with proper bounds checking
+static uint16_t ctap_build_authdata(uint8_t *out, uint16_t max_len,
+                                    const uint8_t *rp_id_hash, uint8_t flags,
+                                    uint32_t counter, const uint8_t *cred_id,
                                     uint16_t cred_id_len,
                                     const hsm_pubkey_t *pub) {
   uint16_t offset = 0;
+
+  if (max_len < 32 + 1 + 4)
+    return 0;
 
   // 1. RP ID Hash (32)
   memcpy(out + offset, rp_id_hash, 32);
@@ -96,11 +106,13 @@ static uint16_t ctap_build_authdata(uint8_t *out, const uint8_t *rp_id_hash,
 
   // 4. Attested Credential Data (if AT flag set)
   if (flags & AUTHDATA_FLAG_AT) {
+    // L (2) - Credential ID Length (Big Endian)
+    if (offset + 16 + 2 + cred_id_len > max_len)
+      return 0;
+
     // AAGUID (16) - All zeros for none attestation
     memset(out + offset, 0, 16);
     offset += 16;
-
-    // L (2) - Credential ID Length (Big Endian)
     out[offset++] = (cred_id_len >> 8) & 0xFF;
     out[offset++] = cred_id_len & 0xFF;
 
@@ -110,7 +122,7 @@ static uint16_t ctap_build_authdata(uint8_t *out, const uint8_t *rp_id_hash,
 
     // COSE Key
     cbor_encoder_t enc;
-    cbor_encoder_init(&enc, out + offset, 256);
+    cbor_encoder_init(&enc, out + offset, max_len - offset);
     if (ctap_encode_cose_key(&enc, pub)) {
       offset += enc.offset;
     }
@@ -150,40 +162,26 @@ bool ctap2_verify_user_verification(void) {
   return false;
 }
 
-// Generate a deterministic credential ID based on RP and user info
+// Helper for SHA-256 hashing
+static void hash_sha256(const uint8_t *data, uint16_t len, uint8_t *out) {
+  mbedtls_sha256_context ctx;
+  mbedtls_sha256_init(&ctx);
+  mbedtls_sha256_starts(&ctx, 0);
+  mbedtls_sha256_update(&ctx, data, len);
+  mbedtls_sha256_finish(&ctx, out);
+  mbedtls_sha256_free(&ctx);
+}
+
+// Generate a random, unguessable credential ID
 uint8_t ctap2_generate_credential_id(const uint8_t *rp_id_hash,
                                      const uint8_t *user_id,
                                      uint16_t user_id_len, uint8_t *cred_id_out,
                                      uint16_t *cred_id_len_out) {
-  // Simple credential ID generation - in production this should be more secure
-  // Format: "OT-" + first 8 bytes of RP hash + first 4 bytes of user ID +
-  // counter
-  static uint32_t cred_counter = 1;
-
-  uint16_t offset = 0;
-
-  // Prefix
-  memcpy(cred_id_out + offset, "OT-", 3);
-  offset += 3;
-
-  // RP ID hash (first 8 bytes)
-  memcpy(cred_id_out + offset, rp_id_hash, 8);
-  offset += 8;
-
-  // User ID (first 4 bytes or less)
-  uint16_t user_copy_len = (user_id_len < 4) ? user_id_len : 4;
-  memcpy(cred_id_out + offset, user_id, user_copy_len);
-  offset += user_copy_len;
-
-  // Counter (4 bytes, big endian)
-  cred_id_out[offset++] = (cred_counter >> 24) & 0xFF;
-  cred_id_out[offset++] = (cred_counter >> 16) & 0xFF;
-  cred_id_out[offset++] = (cred_counter >> 8) & 0xFF;
-  cred_id_out[offset++] = cred_counter & 0xFF;
-
-  *cred_id_len_out = offset;
-  cred_counter++;
-
+  // Use random handle (16 bytes) to prevent user tracking
+  if (!hsm_get_random(cred_id_out, 16)) {
+    return CTAP2_ERR_PROCESSING;
+  }
+  *cred_id_len_out = 16;
   return CTAP2_OK;
 }
 
@@ -379,11 +377,8 @@ uint8_t ctap2_handle_make_credential(const uint8_t *cbor_data,
               const char *rp_id;
               uint16_t rp_id_len;
               if (cbor_decode_tstr(&dec, &rp_id, &rp_id_len)) {
-                // Hash the RP ID to create rp_id_hash
-                // For simplicity, just copy first 32 chars or pad with zeros
-                memset(rp_id_hash, 0, 32);
-                uint16_t copy_len = (rp_id_len < 32) ? rp_id_len : 32;
-                memcpy(rp_id_hash, rp_id, copy_len);
+                // Proper SHA-256 Hash of RP ID
+                hash_sha256((const uint8_t *)rp_id, rp_id_len, rp_id_hash);
               } else {
                 cbor_skip_item(&dec);
               }
@@ -519,9 +514,14 @@ uint8_t ctap2_handle_make_credential(const uint8_t *cbor_data,
     }
 
     if (!stored) {
+      mbedtls_platform_zeroize(&cred, sizeof(cred));
+      mbedtls_platform_zeroize(&keypair, sizeof(keypair));
       return CTAP2_ERR_KEY_STORE_FULL;
     }
+    mbedtls_platform_zeroize(&cred, sizeof(cred));
   }
+
+  mbedtls_platform_zeroize(&keypair, sizeof(keypair));
 
   // Build authenticator data
   uint8_t auth_data[512];
@@ -530,8 +530,9 @@ uint8_t ctap2_handle_make_credential(const uint8_t *cbor_data,
     flags |= AUTHDATA_FLAG_UV;
   }
 
-  uint16_t auth_data_len = ctap_build_authdata(
-      auth_data, rp_id_hash, flags, 0, cred_id, cred_id_len, &keypair.pub);
+  uint16_t auth_data_len =
+      ctap_build_authdata(auth_data, sizeof(auth_data), rp_id_hash, flags, 0,
+                          cred_id, cred_id_len, &keypair.pub);
 
   // Build response
   cbor_encoder_t enc;
@@ -603,10 +604,8 @@ uint8_t ctap2_handle_get_assertion(const uint8_t *cbor_data, uint16_t cbor_len,
       const char *rp_id;
       uint16_t rp_id_len;
       if (cbor_decode_tstr(&dec, &rp_id, &rp_id_len)) {
-        // Hash the RP ID
-        memset(rp_id_hash, 0, 32);
-        uint16_t copy_len = (rp_id_len < 32) ? rp_id_len : 32;
-        memcpy(rp_id_hash, rp_id, copy_len);
+        // Proper SHA-256 Hash
+        hash_sha256((const uint8_t *)rp_id, rp_id_len, rp_id_hash);
       } else {
         cbor_skip_item(&dec);
       }
@@ -697,8 +696,9 @@ uint8_t ctap2_handle_get_assertion(const uint8_t *cbor_data, uint16_t cbor_len,
     flags |= AUTHDATA_FLAG_UV;
   }
 
-  uint16_t auth_data_len = ctap_build_authdata(auth_data, rp_id_hash, flags,
-                                               cred.sign_count, NULL, 0, NULL);
+  uint16_t auth_data_len =
+      ctap_build_authdata(auth_data, sizeof(auth_data), rp_id_hash, flags,
+                          cred.sign_count, NULL, 0, NULL);
 
   // Create signature base (authData + clientDataHash)
   uint8_t sign_data[256 + 32];

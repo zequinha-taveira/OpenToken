@@ -311,6 +311,7 @@ class _MainNavigationState extends State<MainNavigation> {
                       try {
                         final success =
                             await _service.validateOathPin(pinController.text);
+                        pinController.clear(); // Zeroize input field
                         if (success) {
                           Navigator.pop(context);
                           _refreshCodes();
@@ -321,6 +322,7 @@ class _MainNavigationState extends State<MainNavigation> {
                           });
                         }
                       } catch (e) {
+                        pinController.clear();
                         setDialogState(() {
                           errorMessage = "Error validating PIN";
                           isLoading = false;

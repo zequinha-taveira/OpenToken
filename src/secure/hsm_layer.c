@@ -16,8 +16,11 @@
 #include "mbedtls/ecdsa.h"
 #include "mbedtls/ecp.h"
 #include "mbedtls/entropy.h"
+#include "mbedtls/gcm.h"
+#include "mbedtls/hkdf.h"
 #include "mbedtls/md.h"
 #include "mbedtls/platform.h"
+#include "mbedtls/platform_util.h"
 #include "mbedtls/sha256.h"
 
 // Static Contexts (to avoid stack overflow on small micros)
@@ -38,15 +41,18 @@ static void hsm_derive_hardware_key(void) {
   pico_unique_board_id_t board_id;
   pico_get_unique_board_id(&board_id);
 
-  // Derive key using SHA-256 of the board ID + a fixed salt
-  mbedtls_sha256_context ctx;
-  mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts(&ctx, 0);
-  mbedtls_sha256_update(
-      &ctx, (const unsigned char *)"OpenToken-Hardened-Salt-v1", 26);
-  mbedtls_sha256_update(&ctx, board_id.id, 8);
-  mbedtls_sha256_finish(&ctx, g_derived_storage_key);
-  mbedtls_sha256_free(&ctx);
+  // Derive key using HKDF-SHA256 of the board ID
+  const mbedtls_md_info_t *md_info =
+      mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+  const char *salt = "OpenToken-Hardened-Salt-v1";
+  const char *info = "StorageEncryptionKey";
+
+  if (mbedtls_hkdf(md_info, (const unsigned char *)salt, strlen(salt),
+                   board_id.id, 8, (const unsigned char *)info, strlen(info),
+                   g_derived_storage_key, 32) != 0) {
+    printf("HSM: HKDF Key derivation failed!\n");
+    return;
+  }
 
   g_key_derived = true;
   printf("HSM: Hardware-backed storage key derived successfully\n");
@@ -101,21 +107,75 @@ static bool ensure_init_wrapper(void) {
   return is_init;
 }
 
-// Simple XOR encryption/decryption for private key storage using derived key
-static void encrypt_decrypt_key(const uint8_t *input, uint8_t *output) {
+// Secure encryption for private key storage using AES-GCM
+static bool hsm_encrypt_key(const uint8_t *input, uint16_t input_len,
+                            uint8_t *output_128) {
   if (!g_key_derived) {
     hsm_derive_hardware_key();
   }
-  for (int i = 0; i < 32; i++) {
-    output[i] = input[i] ^ g_derived_storage_key[i];
+
+  mbedtls_gcm_context gcm;
+  mbedtls_gcm_init(&gcm);
+
+  if (mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, g_derived_storage_key,
+                         256) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return false;
   }
+
+  uint8_t *nonce = output_128;
+  uint8_t *tag = output_128 + 12;
+  uint8_t *ciphertext = output_128 + 12 + 16;
+
+  // Generate random nonce
+  mbedtls_ctr_drbg_random(&ctr_drbg, nonce, 12);
+
+  if (mbedtls_gcm_crypt_and_tag(&gcm, MBEDTLS_GCM_ENCRYPT, input_len, nonce, 12,
+                                NULL, 0, input, ciphertext, 16, tag) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return false;
+  }
+
+  mbedtls_gcm_free(&gcm);
+  return true;
 }
 
-// Hash PIN for secure comparison
-static void hash_pin(const uint8_t *pin, uint16_t pin_len, uint8_t *hash_out) {
+static bool hsm_decrypt_key(const uint8_t *input_128, uint8_t *output,
+                            uint16_t output_len) {
+  if (!g_key_derived) {
+    hsm_derive_hardware_key();
+  }
+
+  mbedtls_gcm_context gcm;
+  mbedtls_gcm_init(&gcm);
+
+  if (mbedtls_gcm_setkey(&gcm, MBEDTLS_CIPHER_ID_AES, g_derived_storage_key,
+                         256) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return false;
+  }
+
+  const uint8_t *nonce = input_128;
+  const uint8_t *tag = input_128 + 12;
+  const uint8_t *ciphertext = input_128 + 12 + 16;
+
+  if (mbedtls_gcm_auth_decrypt(&gcm, output_len, nonce, 12, NULL, 0, tag, 16,
+                               ciphertext, output) != 0) {
+    mbedtls_gcm_free(&gcm);
+    return false;
+  }
+
+  mbedtls_gcm_free(&gcm);
+  return true;
+}
+
+// Hash PIN with salt for secure comparison
+static void hash_pin(const uint8_t *pin, uint16_t pin_len, const uint8_t *salt,
+                     uint8_t *hash_out) {
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
-  mbedtls_sha256_starts(&ctx, 0); // SHA-256, not SHA-224
+  mbedtls_sha256_starts(&ctx, 0); // SHA-256
+  mbedtls_sha256_update(&ctx, salt, 16);
   mbedtls_sha256_update(&ctx, pin, pin_len);
   mbedtls_sha256_finish(&ctx, hash_out);
   mbedtls_sha256_free(&ctx);
@@ -137,15 +197,17 @@ hsm_pin_result_t hsm_verify_pin_secure(const uint8_t *pin_in,
     return HSM_PIN_LOCKED;
   }
 
-  // Hash the input PIN
+  // Hash the input PIN with stored salt
   uint8_t input_hash[32];
-  hash_pin(pin_in, pin_len, input_hash);
+  hash_pin(pin_in, pin_len, pin_data.pin_salt, input_hash);
 
-  // Compare hashes
+  // Compare hashes (constant-time)
   uint8_t diff = 0;
   for (int i = 0; i < 32; i++) {
     diff |= (input_hash[i] ^ pin_data.pin_hash[i]);
   }
+
+  mbedtls_platform_zeroize(input_hash, 32);
 
   if (diff == 0) {
     // PIN correct - reset retry counter
@@ -179,15 +241,17 @@ bool hsm_reset_pin_counter(const uint8_t *admin_pin, uint16_t admin_pin_len) {
     return false;
   }
 
-  // Hash the admin PIN
+  // Hash the admin PIN with stored salt
   uint8_t admin_hash[32];
-  hash_pin(admin_pin, admin_pin_len, admin_hash);
+  hash_pin(admin_pin, admin_pin_len, pin_data.pin_salt, admin_hash);
 
-  // Compare with stored admin PIN hash
+  // Compare with stored admin PIN hash (constant-time)
   uint8_t diff = 0;
   for (int i = 0; i < 32; i++) {
     diff |= (admin_hash[i] ^ pin_data.admin_pin_hash[i]);
   }
+
+  mbedtls_platform_zeroize(admin_hash, 32);
 
   if (diff == 0) {
     // Admin PIN correct - reset user PIN counter
@@ -257,7 +321,14 @@ bool hsm_generate_key_ecc(hsm_key_slot_t slot, hsm_pubkey_t *pubkey_out) {
   // Extract and encrypt private key before storage
   uint8_t raw_priv[32];
   mbedtls_mpi_write_binary(&key.MBEDTLS_PRIVATE(d), raw_priv, 32);
-  encrypt_decrypt_key(raw_priv, storage_key.priv);
+
+  if (!hsm_encrypt_key(raw_priv, 32, storage_key.priv)) {
+    ERROR_REPORT_ERROR(ERROR_CRYPTO_KEY_GENERATION,
+                       "Symmetric encryption failed");
+    memset(raw_priv, 0, sizeof(raw_priv));
+    mbedtls_ecp_keypair_free(&key);
+    return false;
+  }
 
   // Clear raw private key from memory immediately
   memset(raw_priv, 0, sizeof(raw_priv));
@@ -333,7 +404,11 @@ bool hsm_sign_ecc_slot(hsm_key_slot_t slot, const uint8_t *hash_in,
 
   // Decrypt private key temporarily for signing
   uint8_t raw_priv[32];
-  encrypt_decrypt_key(storage_key.priv, raw_priv);
+  if (!hsm_decrypt_key(storage_key.priv, raw_priv, 32)) {
+    printf("HSM: Private key decryption failed (Auth Error?)\n");
+    memset(&storage_key, 0, sizeof(storage_key));
+    return false;
+  }
 
   // Clear storage key from memory immediately
   memset(&storage_key, 0, sizeof(storage_key));
@@ -370,6 +445,11 @@ bool hsm_sign_ecc_slot(hsm_key_slot_t slot, const uint8_t *hash_in,
   mbedtls_ecp_keypair_free(&key);
 
   return success;
+}
+
+bool hsm_get_random(uint8_t *out, size_t len) {
+  ensure_init();
+  return mbedtls_ctr_drbg_random(&ctr_drbg, out, len) == 0;
 }
 
 // Key management functions

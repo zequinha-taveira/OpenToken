@@ -240,15 +240,16 @@ class OpenTokenSharedService {
 
   /// Set/Change OATH PIN
   Future<bool> setOathPin(String pin) async {
-    final pinBytes = utf8.encode(pin);
-
-    // Hash PIN with SHA-256
-    final pinHash = sha256.convert(pinBytes).bytes;
+    final pinBytes = Uint8List.fromList(utf8.encode(pin));
+    final pinHash = Uint8List.fromList(sha256.convert(pinBytes).bytes);
 
     final data = <int>[TAG_KEY, pinHash.length, ...pinHash];
-
     final apdu = Uint8List.fromList(
         [0x00, OATH_INS_SET_CODE, 0x00, 0x00, data.length, ...data]);
+
+    // Zeroize sensitive materials
+    pinBytes.fillRange(0, pinBytes.length, 0);
+    pinHash.fillRange(0, pinHash.length, 0);
 
     final resp = await transport.sendApdu(apdu);
     return _isSuccess(resp);
@@ -256,13 +257,16 @@ class OpenTokenSharedService {
 
   /// Validate OATH PIN
   Future<bool> validateOathPin(String pin) async {
-    final pinBytes = utf8.encode(pin);
-    final pinHash = sha256.convert(pinBytes).bytes;
+    final pinBytes = Uint8List.fromList(utf8.encode(pin));
+    final pinHash = Uint8List.fromList(sha256.convert(pinBytes).bytes);
 
     final data = <int>[TAG_RESPONSE, pinHash.length, ...pinHash];
-
     final apdu = Uint8List.fromList(
         [0x00, OATH_INS_VALIDATE, 0x00, 0x00, data.length, ...data]);
+
+    // Zeroize sensitive materials
+    pinBytes.fillRange(0, pinBytes.length, 0);
+    pinHash.fillRange(0, pinHash.length, 0);
 
     final resp = await transport.sendApdu(apdu);
     return _isSuccess(resp);

@@ -31,6 +31,7 @@
 #define MBEDTLS_HMAC_DRBG_C
 #define MBEDTLS_CIPHER_C
 #define MBEDTLS_GCM_C
+#define MBEDTLS_HKDF_C
 
 // Prerequisites for Entropy and DRBG
 #define MBEDTLS_NO_PLATFORM_ENTROPY

@@ -78,6 +78,7 @@ typedef struct {
   uint8_t retries_remaining;
   uint8_t pin_hash[32];
   uint8_t admin_pin_hash[32];
+  uint8_t pin_salt[16];
   uint32_t global_counter;
 } storage_system_t;
 

@@ -17,6 +17,7 @@ const uint8_t OATH_AID[OATH_AID_LEN] = {0xA0, 0x00, 0x00, 0x05,
                                         0x27, 0x21, 0x01, 0x01};
 
 static bool is_selected = false;
+static bool is_authenticated = false;
 
 // OATH algorithm types
 #define OATH_TYPE_HOTP 0x10
@@ -144,6 +145,7 @@ static int find_free_slot(void) {
 bool oath_applet_select(const uint8_t *aid, uint8_t len) {
   if (len == OATH_AID_LEN && memcmp(aid, OATH_AID, OATH_AID_LEN) == 0) {
     is_selected = true;
+    is_authenticated = false; // Reset authentication on selection
     printf("OATH Applet: Selected successfully (OpenToken NATIVO App "
            "compatible).\n");
 
@@ -198,12 +200,15 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
       hsm_pin_result_t pin_res = hsm_verify_pin_secure(pin_in, pin_len);
       if (pin_res == HSM_PIN_SUCCESS) {
         printf("OATH Applet: PIN verified successfully.\n");
+        is_authenticated = true;
         SET_SW(OATH_SW_OK);
       } else if (pin_res == HSM_PIN_LOCKED) {
         printf("OATH Applet: PIN locked.\n");
+        is_authenticated = false;
         SET_SW(OATH_SW_SECURITY_STATUS_NOT_SATISFIED);
       } else {
         printf("OATH Applet: PIN incorrect.\n");
+        is_authenticated = false;
         SET_SW(OATH_SW_SECURITY_STATUS_NOT_SATISFIED);
       }
     } else {
@@ -243,14 +248,19 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
     // SET_CODE to set/change password for OATH applet
     printf("OATH Applet: SET_CODE Command - updating OATH PIN.\n");
 
+    if (!is_authenticated) {
+      printf("OATH Applet: SET_CODE failed - session not authenticated.\n");
+      SET_SW(OATH_SW_SECURITY_STATUS_NOT_SATISFIED);
+      break;
+    }
+
     if (lc_val >= 34 && data[0] == OATH_TAG_KEY) {
       uint8_t pin_len = data[1];
       const uint8_t *new_pin = data + 2;
 
       storage_system_t pin_data;
       if (storage_load_pin_data(&pin_data)) {
-        // Here we'd typically check current session state if we required old
-        // PIN first For simplicity during rollout, we just set the new hash
+        // Now allowed because session is authenticated
         memcpy(pin_data.pin_hash, new_pin, 32);
         pin_data.retries_remaining = 3;
         if (storage_save_pin_data(&pin_data)) {
@@ -286,8 +296,8 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
             uint8_t code_tlv_len = 7; // 76 + 5 + digits + 4-byte code
             uint8_t total_inner_len = name_tlv_len + code_tlv_len;
 
-            // Check buffer space
-            if (*response_len + 2 + total_inner_len > 256) {
+            // Check buffer space (Response buffer typically 256 or 512)
+            if (*response_len + 2 + total_inner_len > 250) {
               printf("OATH CALCULATE_ALL: Response buffer full, truncating\n");
               break;
             }
@@ -368,9 +378,13 @@ void oath_applet_process_apdu(const uint8_t *apdu, uint16_t len,
           property = data[offset];
           uint8_t digits = data[offset + 1];
           key_len = len - 2;
-          memcpy(key_buf, data + offset + 2, key_len);
-          printf("OATH PUT: Key len=%d, Prop=0x%02X, Digits=%d\n", key_len,
-                 property, digits);
+          if (key_len <= sizeof(key_buf)) {
+            memcpy(key_buf, data + offset + 2, key_len);
+            printf("OATH PUT: Key len=%d, Prop=0x%02X, Digits=%d\n", key_len,
+                   property, digits);
+          } else {
+            key_len = 0; // Invalid key length
+          }
         }
         break;
 
