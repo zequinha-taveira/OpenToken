@@ -12,3 +12,6 @@ build*/
 _deps/
 *~
 *.swp
+.dart_tool/
+*.snapshot
+pubspec.lock

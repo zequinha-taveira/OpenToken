@@ -1,0 +1,3 @@
+.dart_tool/
+*.snapshot
+pubspec.lock
